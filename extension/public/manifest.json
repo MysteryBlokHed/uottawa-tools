@@ -1,0 +1,24 @@
+{
+    "$schema": "https://json.schemastore.org/chrome-manifest",
+    "manifest_version": 3,
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtAP2v6s3Zd5ksPQSGXgSWsLlSKM8a5QTxPuuMMeottrSLJpOPqnjxp74Rqi4kbMTK46PmIcIb+wnR63z1HfrTUu2NsTnWwWQRJk48S/vcyhhCz7Ox/q/0vNnR+ILSvDrRi8O0iNNVP77NysvLJdDp+3rbbN166vMioaNFlAdpQT+dZ45cxduk9ojzUFkavyZUXRgTb9ONoIzkONQKQ20zfyD03gTiePgVHnG1OjTMpF9Ljjf//tKt+x6Fqjv0sXRVZq2Gs8Qi1YGmPlCZtENb0SAyI70NLl2eUCYhQb9w1enrqIneVFOEEVk8h9REk3nmEUkSZo6o53VAi42a/K5RQIDAQAB",
+    "name": "uOttawa Tools",
+    "version": "0.1.0",
+    "description": "A quality of life extension for uOttawa students.",
+    "permissions": ["identity", "storage"],
+    "action": {
+        "default_title": "uOttawa Tools",
+        "default_popup": "index.html"
+    },
+    "oauth2": {
+        "client_id": "489465465400-ptsa6pkcjehmevhtnjdpuj00cka1nnv7.apps.googleusercontent.com",
+        "scopes": ["https://www.googleapis.com/auth/calendar.events.owned"]
+    },
+    "content_scripts": [
+        {
+            "matches": ["https://*.uocampus.uottawa.ca/*"],
+            "js": ["content-script.js"],
+            "all_frames": true
+        }
+    ]
+}
