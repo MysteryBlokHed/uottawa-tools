@@ -1,7 +1,8 @@
-import type { Class } from "./utils/export-classes";
+import type { Class } from "../utils/export-classes";
 
 export const enum EventType {
     GoogleSync,
+    RmpBasicMulti,
 }
 
 export interface GoogleSync {
@@ -9,4 +10,9 @@ export interface GoogleSync {
     classes: Class[];
 }
 
-export type ExtensionEvent = GoogleSync;
+export interface RmpBasicMulti {
+    event: EventType.RmpBasicMulti;
+    names: string[];
+}
+
+export type ExtensionEvent = GoogleSync | RmpBasicMulti;

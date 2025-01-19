@@ -9,6 +9,9 @@ import { createEvents } from "../utils/ics";
 
     switch (page.page) {
         case CurrentPage.ClassSchedule: {
+            // =======================
+            // Calendar Export Buttons
+            // =======================
             const row = document.querySelector<HTMLTableRowElement>("tr[id*=trCLASS_MTG_VW]");
             const btnContainer =
                 // @ts-expect-error This UI is terrible and this is the best idea I've got
@@ -42,11 +45,15 @@ import { createEvents } from "../utils/ics";
                     event: EventType.GoogleSync,
                     classes: page.classes,
                 });
-                console.log(response);
+                console.log("Response:", response);
             };
 
             btnContainer!.prepend(googleCalButton);
             btnContainer!.prepend(icsButton);
+
+            // ===============
+            // RMP Integration
+            // ===============
         }
     }
 })();
