@@ -8,6 +8,8 @@ import {
     type Professor,
 } from "../utils/rmp.js";
 
+const AI_ENDPOINT = "http://127.0.0.1:8000";
+
 chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResponse) => {
     (async () => {
         console.log("Got message:", message);
@@ -36,8 +38,9 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                                 },
                             },
                         ).then(r => r.json());
-                        if (response.items) sendResponse({ success: true, calendars: response.items });
-                        else throw new Error('Problem getting calendar list');
+                        if (response.items)
+                            sendResponse({ success: true, calendars: response.items });
+                        else throw new Error("Problem getting calendar list");
                     } catch (e) {
                         console.error("Failed to send request", e);
                         sendResponse({ success: false });
@@ -48,9 +51,9 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
             case EventType.GooglePush:
                 {
                     console.log("Received request to sync to Google Calendar");
-                    const { googleCalendarId } = await chrome.storage.local.get('googleCalendarId');
+                    const { googleCalendarId } = await chrome.storage.local.get("googleCalendarId");
                     if (googleCalendarId == null) {
-                        console.error('No calendar ID specified');
+                        console.error("No calendar ID specified");
                         sendResponse({ success: false });
                         return;
                     }
@@ -93,7 +96,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                     const validIndices = professorEntries
                         .map((professor, i) => {
                             if (!professor) return null;
-                            if (`${professor.firstName} ${professor.lastName}`.toLowerCase() != message.names[i].toLowerCase())
+                            if (
+                                `${professor.firstName} ${professor.lastName}`.toLowerCase() !=
+                                message.names[i].toLowerCase()
+                            )
                                 return null;
                             return i;
                         })
@@ -103,6 +109,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                         sendResponse({
                             success: true,
                             ratings: Array(professorEntries.length).fill(null),
+                            ids: Array(professorEntries.length).fill(null),
                         });
                         return;
                     }
@@ -122,14 +129,30 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
 
                     // Re-align the professors whose ratings we could find with the professorEntries array
                     const professorRatings = Array(professorEntries.length).fill(null);
+                    const professorIds = Array(professorEntries.length).fill(null);
                     for (let i = 0; i < professorRatingsUnmapped.length; ++i) {
                         professorRatings[validIndices[i]] = professorRatingsUnmapped[i];
+                        professorIds[validIndices[i]] = professorEntries[validIndices[i]]!.id;
                     }
 
                     // Finally, send data back
-                    sendResponse({ success: true, ratings: professorRatings });
+                    sendResponse({ success: true, ratings: professorRatings, ids: professorIds });
                 }
                 break;
+            case EventType.ProfessorAiCompletion:
+                console.log("Getting AI completion for professor info");
+                try {
+                    const response = await fetch(
+                        `${AI_ENDPOINT}/prof_feedback/${encodeURIComponent(message.professorId)}/${encodeURIComponent(message.courseCode)}/${encodeURIComponent(message.courseName)}/${encodeURIComponent(message.prompt)}`,
+                        { headers: { "Access-Control-Allow-Origin": "*" } },
+                    ).then(r => r.json());
+                    if (!response) throw new Error("Empty response from endpoint");
+                    sendResponse({ success: true, response });
+                } catch (e) {
+                    console.error("Failed to get AI completion", e);
+                    sendResponse({ success: false });
+                    return;
+                }
             default:
                 sendResponse({ success: false });
         }

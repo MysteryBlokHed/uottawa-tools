@@ -6,6 +6,7 @@
     async function initializeOptions() {
         options = (await chrome.storage.local.get([
             "rmp",
+            "rmpAiFeedback",
             "calendarExport",
             "calendarAutoRefresh",
             "googleCalendarId",
@@ -62,6 +63,7 @@
     <h2>General Options</h2>
     {#if options}
         {@render option("rmp", "Rate My Professors integration")}
+        {@render option("rmpAiFeedback", "AI chat option to ask about professors")}
         {@render option("calendarExport", "Calendar export for schedule")}
         {@render option("calendarAutoRefresh", "Auto-apply filters for weekly calendar")}
     {/if}

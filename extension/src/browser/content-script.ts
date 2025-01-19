@@ -26,12 +26,15 @@ async function addRmp(
     });
     if (!profRatingsResponse.success) return null;
     const ratings = profRatingsResponse.ratings as BasicRating[];
+    const ids = profRatingsResponse.ids as string[];
 
     // Create mapping of prof names to ratings
     const profRatingsMap: Record<string, BasicRating> = {};
+    const profIdsMap: Record<string, string> = {};
     for (let i = 0; i < ratings.length; ++i) {
         if (ratings[i] == null) continue;
         profRatingsMap[profNames[i]] = ratings[i];
+        profIdsMap[profNames[i]] = ids[i];
     }
 
     for (const row of rows()) {
@@ -60,16 +63,16 @@ async function addRmp(
         nameCol.appendChild(rmpLink);
     }
 
-    return ratings;
+    return [profRatingsMap, profIdsMap] as const;
 }
 
 let observer: MutationObserver | null = null;
 
 async function main() {
     const page = identifyPage();
-    console.log("Identified page", page);
     const options = (await chrome.storage.local.get([
         "rmp",
+        "rmpAiFeedback",
         "calendarExport",
         "calendarAutoRefresh",
     ] satisfies Array<keyof Options>)) as Options;
@@ -127,7 +130,50 @@ async function main() {
                 if (options.rmp) {
                     const rows =
                         document.querySelectorAll<HTMLTableRowElement>("tr[id*=trCLASS_MTG_VW]");
-                    addRmp(() => rows.values(), 5, false);
+                    const rmpResponse = await addRmp(() => rows.values(), 5, false);
+                    if (rmpResponse != null) {
+                        // ===========
+                        // RMP AI Chat
+                        // ===========
+                        if (options.rmpAiFeedback) {
+                            const ids = rmpResponse[1];
+                            for (const row of rows.values()) {
+                                const name = (
+                                    (row.children[5] as HTMLTableColElement)
+                                        .children[0] as HTMLDivElement
+                                ).innerText;
+                                if (name && name in ids) {
+                                    // prettier-ignore
+                                    const classParent: string =
+                                        // @ts-expect-error
+                                        row.parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            // @ts-expect-error
+                                            .parentElement.parentElement.children[0].innerText;
+                                    const [courseCode, courseName] = classParent.split(" - ");
+                                    const aiButton = document.createElement("button");
+                                    aiButton.type = "button";
+                                    aiButton.style.width = "100%";
+                                    aiButton.innerText = "Ask AI";
+                                    aiButton.onclick = async () => {
+                                        const query = prompt("Enter your prompt:");
+                                        if (!query) return;
+                                        const { response } =
+                                            await chrome.runtime.sendMessage<ExtensionEvent>({
+                                                event: EventType.ProfessorAiCompletion,
+                                                courseCode: courseCode.replaceAll(" ", ""),
+                                                courseName,
+                                                professorId: ids[name],
+                                                prompt: query,
+                                            });
+                                        alert(response);
+                                    };
+                                    row.children[5].appendChild(aiButton);
+                                }
+                            }
+                        }
+                    }
                 }
             }
             break;
