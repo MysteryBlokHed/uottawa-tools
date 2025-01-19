@@ -3,7 +3,7 @@ import { CurrentPage, identifyPage } from "./page-info.js";
 import { classToEvents } from "../utils/export-classes.js";
 import { createEvents } from "../utils/ics.js";
 import type { BasicRating } from "../utils/rmp.js";
-import type { Options } from '../stores.js';
+import type { Options } from "../stores.js";
 
 async function addRmp(
     rows: () => Iterable<HTMLTableRowElement>,
@@ -61,7 +61,7 @@ async function addRmp(
 
         // TODO: Instead of just only considering one prof name in lists with multiple names, check all names
         // (although I have never actually seen the names be different)
-        if (multilineNames) nameCol.innerText = name + '\n';
+        if (multilineNames) nameCol.innerText = name + "\n";
         nameCol.appendChild(rmpLink);
     }
 
@@ -73,7 +73,11 @@ let observer: MutationObserver | null = null;
 async function main() {
     const page = identifyPage();
     console.log("Identified page", page);
-    const options = await chrome.storage.local.get(['rmp', 'calendarExport']) as Options;
+    const options = (await chrome.storage.local.get([
+        "rmp",
+        "calendarExport",
+        "calendarAutoRefresh",
+    ] satisfies Array<keyof Options>)) as Options;
 
     switch (page.page) {
         case CurrentPage.ClassSchedule:
@@ -82,7 +86,8 @@ async function main() {
                 // Calendar Export Buttons
                 // =======================
                 if (options.calendarExport) {
-                    const row = document.querySelector<HTMLTableRowElement>("tr[id*=trCLASS_MTG_VW]");
+                    const row =
+                        document.querySelector<HTMLTableRowElement>("tr[id*=trCLASS_MTG_VW]");
                     const btnContainer =
                         // @ts-expect-error This UI is terrible and this is the best idea I've got
                         row.parentElement.parentElement.parentElement.parentElement.parentElement
@@ -134,7 +139,6 @@ async function main() {
             break;
         case CurrentPage.ClassSelector:
             {
-                console.log("class selector block");
                 // ===============
                 // RMP Integration
                 // ===============
@@ -144,6 +148,32 @@ async function main() {
                     );
                     console.log(rows);
                     addRmp(() => rows.values(), 4, true);
+                }
+            }
+            break;
+        case CurrentPage.WeeklyCalendar:
+            {
+                // =================
+                // Automatic refresh
+                // =================
+                if (options.calendarAutoRefresh) {
+                    const registerListeners = () => {
+                        const container = document.querySelector(
+                            "div[id*=DERIVED_CLASS_S_MONDAY_LBL]",
+                        )!;
+                        const checkboxes =
+                            container.querySelectorAll<HTMLInputElement>("input[type=checkbox]");
+                        const refreshButton =
+                            container.querySelector<HTMLInputElement>("input[type=button]")!;
+                        checkboxes.forEach(checkbox =>
+                            checkbox.addEventListener("input", () => refreshButton.click()),
+                        );
+                    };
+                    const calendarObserver = new MutationObserver(registerListeners);
+                    registerListeners();
+                    calendarObserver.observe(document.getElementById("win0divPSPAGECONTAINER")!, {
+                        childList: true,
+                    });
                 }
             }
             break;

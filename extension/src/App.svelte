@@ -29,5 +29,6 @@
     {#if options}
         {@render option("rmp", "Rate My Professors integration")}
         {@render option("calendarExport", "Calendar export for schedule")}
+        {@render option("calendarAutoRefresh", "Auto-apply filters for weekly calendar")}
     {/if}
 </main>

@@ -3,6 +3,7 @@ import type { Class } from "../utils/export-classes";
 export const enum EventType {
     GoogleSync,
     RmpBasicMulti,
+    WeeklyCalendar,
 }
 
 export interface GoogleSync {
