@@ -37,12 +37,10 @@
         chrome.runtime.sendMessage<ExtensionEvent>(
             { event: EventType.GoogleCalendarList },
             response => {
-                console.log("FROM POPUP got response", response);
                 if (response.success) calendars = response.calendars;
             },
         );
     });
-    $effect(() => console.log("calendars:", calendars));
 
     async function enableSync() {
         const token = await chrome.identity.getAuthToken({ interactive: true });

@@ -18,7 +18,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
 
                     let token: chrome.identity.GetAuthTokenResult;
                     try {
-                        token = await chrome.identity.getAuthToken({ interactive: true });
+                        token = await chrome.identity.getAuthToken({ interactive: false });
                         if (!token.token) throw new Error("Didn't receive token from Chrome");
                     } catch (e) {
                         console.error("Failed to get auth token", e);
@@ -36,7 +36,6 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                                 },
                             },
                         ).then(r => r.json());
-                        console.log(response);
                         if (response.items) sendResponse({ success: true, calendars: response.items });
                         else throw new Error('Problem getting calendar list');
                     } catch (e) {
@@ -58,7 +57,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
 
                     let token: chrome.identity.GetAuthTokenResult;
                     try {
-                        token = await chrome.identity.getAuthToken({ interactive: true });
+                        token = await chrome.identity.getAuthToken({ interactive: false });
                         if (!token.token) throw new Error("Didn't receive token from Chrome");
                     } catch (e) {
                         console.error("Failed to get auth token", e);
@@ -68,17 +67,6 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                     console.log("Authorization received");
 
                     try {
-                        const response = await fetch(
-                            "https://www.googleapis.com/calendar/v3/users/me/calendarList",
-                            {
-                                headers: {
-                                    Authorization: `Bearer ${token.token}`,
-                                },
-                            },
-                        ).then(r => r.json());
-
-                        console.log(response);
-
                         await bulkCreateEvents(token.token, googleCalendarId, message.classes);
                     } catch (e) {
                         console.error("Failed to send request", e);

@@ -12,25 +12,20 @@ async function addRmp(
 ) {
     // Find unique prof names
     const profNamesSet = new Set<string>();
-    console.log("Initial iteration");
     for (const row of rows()) {
         const name = (row.children[profCol] as HTMLTableColElement).innerText.split("\n")[0].trim();
-        console.log("Got name", name);
         if (!name || name == "To be Announced") continue;
         profNamesSet.add(name);
     }
     const profNames = Array.from(profNamesSet);
-    console.log("Got names", profNames);
 
     // Request basic prof ratings
     const profRatingsResponse = await chrome.runtime.sendMessage<ExtensionEvent>({
         event: EventType.RmpBasicMulti,
         names: profNames,
     });
-    console.log("Response", profRatingsResponse);
     if (!profRatingsResponse.success) return null;
     const ratings = profRatingsResponse.ratings as BasicRating[];
-    console.log(ratings);
 
     // Create mapping of prof names to ratings
     const profRatingsMap: Record<string, BasicRating> = {};
@@ -120,7 +115,6 @@ async function main() {
                             event: EventType.GooglePush,
                             classes: page.classes,
                         });
-                        console.log("Response:", response);
                     };
 
                     btnContainer!.prepend(googleCalButton);
@@ -146,7 +140,6 @@ async function main() {
                     const rows = document.querySelectorAll<HTMLTableRowElement>(
                         "tr[id*=trSSR_CLSRCH_MTG1]",
                     );
-                    console.log(rows);
                     addRmp(() => rows.values(), 4, true);
                 }
             }

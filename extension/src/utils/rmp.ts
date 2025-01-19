@@ -49,8 +49,6 @@ export async function findProfsByName(names: readonly string[]): Promise<Array<P
         )
         .join("\n");
 
-    console.log(requests);
-
     const response = (await sendQuery(`query { ${requests} }`)) as any;
     if (response.errors) throw response.errors;
     // Convert responses into array
@@ -58,7 +56,6 @@ export async function findProfsByName(names: readonly string[]): Promise<Array<P
         ([key, value]) => [parseInt(key.slice(1)), value] as const,
     );
     data.sort(([a], [b]) => a - b);
-    console.log("just before bullshit:", data);
     return data.map(
         ([, value]) => (value as any).teachers.edges[0]?.node || null,
     ) as Array<Professor | null>;
