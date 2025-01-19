@@ -117,7 +117,7 @@ async function main() {
                     googleCalButton.innerText = "Export to Google Calendar";
                     googleCalButton.onclick = async ev => {
                         const response = await chrome.runtime.sendMessage<ExtensionEvent>({
-                            event: EventType.GoogleSync,
+                            event: EventType.GooglePush,
                             classes: page.classes,
                         });
                         console.log("Response:", response);

@@ -1,11 +1,19 @@
 <script lang="ts">
+    import { EventType, type ExtensionEvent } from "./browser/messaging";
     import type { Options } from "./stores";
 
     let options: Options | null = $state(null);
     async function initializeOptions() {
-        options = (await chrome.storage.local.get(["rmp", "calendarExport"] as const)) as Options;
+        options = (await chrome.storage.local.get([
+            "rmp",
+            "calendarExport",
+            "calendarAutoRefresh",
+            "googleCalendarId",
+        ] as const)) as Options;
         options.rmp ??= true;
         options.calendarExport ??= true;
+        options.calendarAutoRefresh ??= true;
+        options.googleCalendarId ??= null;
     }
     initializeOptions();
 
@@ -13,12 +21,39 @@
         if (!options) return;
         chrome.storage.local.set(options);
     });
+
+    let authorized: boolean | null = $state(null);
+    chrome.identity
+        .getAuthToken({ interactive: false })
+        .then(token => {
+            if (token.token) authorized = true;
+            else authorized = false;
+        })
+        .catch(() => (authorized = false));
+
+    let calendars: any[] | null = $state(null);
+    $effect(() => {
+        if (!authorized) return;
+        chrome.runtime.sendMessage<ExtensionEvent>(
+            { event: EventType.GoogleCalendarList },
+            response => {
+                console.log("FROM POPUP got response", response);
+                if (response.success) calendars = response.calendars;
+            },
+        );
+    });
+    $effect(() => console.log("calendars:", calendars));
+
+    async function enableSync() {
+        const token = await chrome.identity.getAuthToken({ interactive: true });
+        if (token.token) authorized = true;
+    }
 </script>
 
 {#snippet option(property: string & keyof Options, label: string)}
     <div class="form-control">
         <label>
-            <input type="checkbox" bind:checked={options![property]} />
+            <input type="checkbox" bind:checked={options![property] as boolean} />
             <span>{label}</span>
         </label>
     </div>
@@ -26,9 +61,24 @@
 
 <main>
     <h1>uOttawa Tools</h1>
+    <h2>General Options</h2>
     {#if options}
         {@render option("rmp", "Rate My Professors integration")}
         {@render option("calendarExport", "Calendar export for schedule")}
         {@render option("calendarAutoRefresh", "Auto-apply filters for weekly calendar")}
+    {/if}
+    <h2>Google Calendar</h2>
+    {#if authorized === false}
+        <button onclick={enableSync}>Enable Google Calendar Sync</button>
+    {/if}
+    {#if options && calendars != null}
+        <label>
+            <span>Target Calendar</span>
+            <select bind:value={options.googleCalendarId}>
+                {#each calendars.filter(calendar => calendar.accessRole === "owner") as calendar}
+                    <option value={calendar.id}>{calendar.summary}</option>
+                {/each}
+            </select>
+        </label>
     {/if}
 </main>

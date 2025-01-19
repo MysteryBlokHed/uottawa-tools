@@ -1,13 +1,18 @@
 import type { Class } from "../utils/export-classes";
 
 export const enum EventType {
-    GoogleSync,
+    GoogleCalendarList,
+    GooglePush,
     RmpBasicMulti,
     WeeklyCalendar,
 }
 
-export interface GoogleSync {
-    event: EventType.GoogleSync;
+export interface GoogleCalendarList {
+    event: EventType.GoogleCalendarList;
+}
+
+export interface GooglePush {
+    event: EventType.GooglePush;
     classes: Class[];
 }
 
@@ -16,4 +21,4 @@ export interface RmpBasicMulti {
     names: string[];
 }
 
-export type ExtensionEvent = GoogleSync | RmpBasicMulti;
+export type ExtensionEvent = GoogleCalendarList | GooglePush | RmpBasicMulti;

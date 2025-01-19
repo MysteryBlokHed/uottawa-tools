@@ -8,13 +8,53 @@ import {
     type Professor,
 } from "../utils/rmp.js";
 
-chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResponse) => {
     (async () => {
         console.log("Got message:", message);
         switch (message.event) {
-            case EventType.GoogleSync:
+            case EventType.GoogleCalendarList:
+                {
+                    console.log("Received request to get Google Calendar list");
+
+                    let token: chrome.identity.GetAuthTokenResult;
+                    try {
+                        token = await chrome.identity.getAuthToken({ interactive: true });
+                        if (!token.token) throw new Error("Didn't receive token from Chrome");
+                    } catch (e) {
+                        console.error("Failed to get auth token", e);
+                        sendResponse({ success: false });
+                        return;
+                    }
+                    console.log("Authorization received");
+
+                    try {
+                        const response = await fetch(
+                            "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${token.token}`,
+                                },
+                            },
+                        ).then(r => r.json());
+                        console.log(response);
+                        if (response.items) sendResponse({ success: true, calendars: response.items });
+                        else throw new Error('Problem getting calendar list');
+                    } catch (e) {
+                        console.error("Failed to send request", e);
+                        sendResponse({ success: false });
+                        return;
+                    }
+                }
+                break;
+            case EventType.GooglePush:
                 {
                     console.log("Received request to sync to Google Calendar");
+                    const { googleCalendarId } = await chrome.storage.local.get('googleCalendarId');
+                    if (googleCalendarId == null) {
+                        console.error('No calendar ID specified');
+                        sendResponse({ success: false });
+                        return;
+                    }
 
                     let token: chrome.identity.GetAuthTokenResult;
                     try {
@@ -37,7 +77,9 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                             },
                         ).then(r => r.json());
 
-                        await bulkCreateEvents(token.token, "placeholder", message.classes);
+                        console.log(response);
+
+                        await bulkCreateEvents(token.token, googleCalendarId, message.classes);
                     } catch (e) {
                         console.error("Failed to send request", e);
                         sendResponse({ success: false });
@@ -79,7 +121,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
 
                     const profsToRequest = professorEntries
                         .filter((_, i) => validIndices.includes(i))
-                        .map(professor => professor.id);
+                        .map(professor => professor!.id);
 
                     let professorRatingsUnmapped: BasicRating[];
                     try {
