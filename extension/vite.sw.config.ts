@@ -4,15 +4,15 @@ import { resolve } from "path";
 export default defineConfig({
     build: {
         lib: {
-            entry: resolve(__dirname, "src/browser/content-script.ts"),
+            entry: resolve(__dirname, "src/browser/service-worker.ts"),
             name: "ContentScript",
-            fileName: "content-script",
+            fileName: "service-worker",
             formats: ["iife"],
         },
         rollupOptions: {
             output: {
                 extend: true,
-                entryFileNames: "content-script.js",
+                entryFileNames: "service-worker.js",
             },
         },
         emptyOutDir: false,

@@ -9,11 +9,19 @@ export interface ClassEvent {
     time: string;
 }
 
+export interface ClassEventDates {
+    location: string;
+    instructor: string;
+    startDate: Date;
+    endEventDate: Date;
+    endRecurDate: Date;
+}
+
 export interface ClassComponent {
     classNumber: number;
     section: string;
     component: string;
-    event: ClassEvent;
+    event: ClassEventDates;
 }
 
 export interface Class {
@@ -68,13 +76,39 @@ export function readSchedule() {
         const time = children[3].innerText;
         const location = children[4].innerText;
         const instructor = children[5].innerText;
-        const [startDate, endDate] = children[6].innerText.split(" - ");
+        const [startDateStr, endDateStr] = children[6].innerText.split(" - ");
+
+        const [weekday, startTimeStr, endTimeStr] = eventToStartAndEnd(time);
+        const startDate = getNextWeekday(startDateStr, weekday);
+
+        const endRecurDate = new Date(endDateStr);
+
+        const [, startHourStr, startMinuteStr, startPeriod] = startTimeStr.match(TIME_EXP)!;
+        const [, endHourStr, endMinuteStr, endPeriod] = endTimeStr.match(TIME_EXP)!;
+
+        const [startHour, startMinute] = timeTo24Hour(
+            parseInt(startHourStr),
+            parseInt(startMinuteStr),
+            startPeriod as any,
+        );
+        const [endHour, endMinute] = timeTo24Hour(
+            parseInt(endHourStr),
+            parseInt(endMinuteStr),
+            endPeriod as any,
+        );
+
+        startDate.setHours(startHour);
+        startDate.setMinutes(startMinute);
+        const endEventDate = structuredClone(startDate);
+        endEventDate.setHours(endHour);
+        endEventDate.setMinutes(endMinute);
+
         // Add this class component to our current class
         currentClass!.components.push({
             classNumber,
             section,
             component,
-            event: { time, location, instructor, startDate, endDate },
+            event: { location, instructor, startDate, endEventDate, endRecurDate },
         });
     }
 
@@ -140,13 +174,14 @@ export function getPrevWeekday(date: string, day: number) {
  * Parses an event into a weekday, start date, and end date.
  * Should call {@link getNextWeekday} and {@link getPrevWeekday} to fix dates.
  */
-export function eventToStartAndEnd(event: ClassEvent) {
-    const weekdayStr = event.time.slice(0, 2);
+export function eventToStartAndEnd(time: string) {
+    const weekdayStr = time.slice(0, 2);
     const weekday = twoLetterToWeekday(weekdayStr);
-    const [startTime, endTime] = event.time.slice(3).split(" - ");
+    const [startTime, endTime] = time.slice(3).split(" - ");
     return [weekday, startTime, endTime] as const;
 }
 
+/** Regex to match a start/end time */
 const TIME_EXP = /^(\d{1,2}):(\d{1,2})([AP]M)$/;
 
 function timeTo24Hour(hours: number, minutes: number, period: "AM" | "PM") {
@@ -164,31 +199,9 @@ function timeTo24Hour(hours: number, minutes: number, period: "AM" | "PM") {
 export function classToEvents(classInfo: Class): EventAttributes[] {
     const { code, name, components } = classInfo;
     return components.map<EventAttributes>(component => {
-        const [weekday, startTimeStr, endTimeStr] = eventToStartAndEnd(component.event);
-        const startDate = getNextWeekday(component.event.startDate, weekday);
+        const { startDate, endEventDate, endRecurDate } = component.event;
 
-        const endRecurDate = new Date(component.event.endDate);
-        const recurrenceDate = `${endRecurDate.getUTCFullYear().toString()}${(endRecurDate.getUTCMonth() + 1).toString().padStart(2, "0")}${endRecurDate.getUTCDate().toString().padStart(2, "0")}000000Z`;
-
-        const [, startHourStr, startMinuteStr, startPeriod] = startTimeStr.match(TIME_EXP)!;
-        const [, endHourStr, endMinuteStr, endPeriod] = endTimeStr.match(TIME_EXP)!;
-
-        const [startHour, startMinute] = timeTo24Hour(
-            parseInt(startHourStr),
-            parseInt(startMinuteStr),
-            startPeriod as any,
-        );
-        const [endHour, endMinute] = timeTo24Hour(
-            parseInt(endHourStr),
-            parseInt(endMinuteStr),
-            endPeriod as any,
-        );
-
-        startDate.setHours(startHour);
-        startDate.setMinutes(startMinute);
-        const endEventDate = structuredClone(startDate);
-        endEventDate.setHours(endHour);
-        endEventDate.setMinutes(endMinute);
+        const recurrenceEnd = `${endRecurDate.getUTCFullYear().toString()}${(endRecurDate.getUTCMonth() + 1).toString().padStart(2, "0")}${endRecurDate.getUTCDate().toString().padStart(2, "0")}000000Z`;
 
         return {
             title: `${code} ${name} ${component.component}`,
@@ -208,7 +221,7 @@ export function classToEvents(classInfo: Class): EventAttributes[] {
                 endEventDate.getUTCHours(),
                 endEventDate.getUTCMinutes(),
             ],
-            recurrenceRule: `FREQ=WEEKLY;UNTIL=${recurrenceDate}`,
+            recurrenceRule: `FREQ=WEEKLY;UNTIL=${recurrenceEnd}`,
         };
     });
 }

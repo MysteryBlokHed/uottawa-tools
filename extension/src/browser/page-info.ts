@@ -1,5 +1,5 @@
-import type { Class } from "./utils/export-classes.js";
-import { readSchedule } from "./utils/export-classes.js";
+import type { Class } from "../utils/export-classes.js";
+import { readSchedule } from "../utils/export-classes.js";
 
 export enum CurrentPage {
     Unknown = -1,

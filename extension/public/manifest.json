@@ -6,13 +6,19 @@
     "version": "0.1.0",
     "description": "A quality of life extension for uOttawa students.",
     "permissions": ["identity", "storage"],
+    "background": {
+        "service_worker": "service-worker.js"
+    },
     "action": {
         "default_title": "uOttawa Tools",
         "default_popup": "index.html"
     },
     "oauth2": {
         "client_id": "489465465400-ptsa6pkcjehmevhtnjdpuj00cka1nnv7.apps.googleusercontent.com",
-        "scopes": ["https://www.googleapis.com/auth/calendar.events.owned"]
+        "scopes": [
+            "https://www.googleapis.com/auth/calendar.events.owned",
+            "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
+        ]
     },
     "content_scripts": [
         {

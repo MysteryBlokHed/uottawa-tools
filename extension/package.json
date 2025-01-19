@@ -5,14 +5,16 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build",
+        "build": "vite build && vite build -c vite.content.config.ts && vite build -c vite.sw.config.ts",
         "preview": "vite preview",
         "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
     },
     "devDependencies": {
         "@sveltejs/vite-plugin-svelte": "^5.0.3",
         "@tsconfig/svelte": "^5.0.4",
+        "@types/chrome": "^0.0.297",
         "@types/node": "^22.10.7",
+        "googleapis": "^144.0.0",
         "ics": "^3.8.1",
         "prettier": "^3.4.2",
         "prettier-plugin-svelte": "^3.3.3",
