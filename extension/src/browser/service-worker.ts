@@ -105,7 +105,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                     const validIndices = professorEntries
                         .map((professor, i) => {
                             if (!professor) return null;
-                            if (`${professor.firstName} ${professor.lastName}` != message.names[i])
+                            if (`${professor.firstName} ${professor.lastName}`.toLowerCase() != message.names[i].toLowerCase())
                                 return null;
                             return i;
                         })
