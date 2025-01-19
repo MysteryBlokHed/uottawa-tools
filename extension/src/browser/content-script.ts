@@ -66,6 +66,46 @@ async function addRmp(
     return [profRatingsMap, profIdsMap] as const;
 }
 
+function createAiDialog() {
+    const dialog = document.createElement('dialog');
+    dialog.style.textAlign = 'center';
+    dialog.style.width = '400px';
+    dialog.style.height = '600px';
+    dialog.style.display = 'flex';
+    dialog.style.flexDirection = 'column';
+    dialog.style.justifyContent = 'space-between';
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+
+    const title = document.createElement('h1');
+    title.innerText = 'Ask AI';
+    dialog.appendChild(title);
+
+    const response = document.createElement('p');
+    response.style.height = '100%';
+    dialog.appendChild(response);
+
+    const inputContainer = document.createElement('div');
+    inputContainer.style.display = 'flex';
+    dialog.appendChild(inputContainer);
+
+    const submitButton = document.createElement('button');
+    submitButton.innerText = 'Ask';
+
+    const promptInput = document.createElement('input');
+    promptInput.type = 'text';
+    promptInput.style.width = '100%';
+    promptInput.addEventListener('keyup', ev => {
+        if (ev.key === 'Enter') submitButton.click();
+    })
+
+    inputContainer.appendChild(promptInput);
+    inputContainer.appendChild(submitButton);
+
+    document.body.appendChild(dialog);
+
+    return [dialog, submitButton, response, promptInput] as const;
+}
+
 let observer: MutationObserver | null = null;
 
 async function main() {
@@ -80,6 +120,11 @@ async function main() {
     switch (page.page) {
         case CurrentPage.ClassSchedule:
             {
+                // Stop weird behaviour when escape is pressed
+                document.addEventListener('keydown', ev => {
+                    if (ev.key === 'Escape') ev.stopImmediatePropagation();
+                }, { capture: true })
+
                 // =======================
                 // Calendar Export Buttons
                 // =======================
@@ -157,17 +202,22 @@ async function main() {
                                     aiButton.style.width = "100%";
                                     aiButton.innerText = "Ask AI";
                                     aiButton.onclick = async () => {
-                                        const query = prompt("Enter your prompt:");
-                                        if (!query) return;
-                                        const { response } =
-                                            await chrome.runtime.sendMessage<ExtensionEvent>({
-                                                event: EventType.ProfessorAiCompletion,
-                                                courseCode: courseCode.replaceAll(" ", ""),
-                                                courseName,
-                                                professorId: ids[name],
-                                                prompt: query,
-                                            });
-                                        alert(response);
+                                        const [dialog, sendButton, responseArea, input] = createAiDialog();
+                                        sendButton.addEventListener('click', async () => {
+                                            if (input.value.trim().length === 0) return;
+
+                                            const { response } =
+                                                await chrome.runtime.sendMessage<ExtensionEvent>({
+                                                    event: EventType.ProfessorAiCompletion,
+                                                    courseCode: courseCode.replaceAll(" ", ""),
+                                                    courseName,
+                                                    professorId: ids[name],
+                                                    prompt: input.value.trim(),
+                                                });
+
+                                            responseArea.innerText = response;
+                                        })
+                                        dialog.showModal();
                                     };
                                     row.children[5].appendChild(aiButton);
                                 }
