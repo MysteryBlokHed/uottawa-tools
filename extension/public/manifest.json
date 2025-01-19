@@ -6,7 +6,7 @@
     "version": "0.1.0",
     "description": "A quality of life extension for uOttawa students.",
     "permissions": ["identity", "storage"],
-    "host_permissions": ["https://www.ratemyprofessors.com/graphql"],
+    "host_permissions": ["https://www.ratemyprofessors.com/graphql", "http://127.0.0.1:8000/*"],
     "background": {
         "service_worker": "service-worker.js"
     },

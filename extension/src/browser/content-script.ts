@@ -26,12 +26,15 @@ async function addRmp(
     });
     if (!profRatingsResponse.success) return null;
     const ratings = profRatingsResponse.ratings as BasicRating[];
+    const ids = profRatingsResponse.ids as string[];
 
     // Create mapping of prof names to ratings
     const profRatingsMap: Record<string, BasicRating> = {};
+    const profIdsMap: Record<string, string> = {};
     for (let i = 0; i < ratings.length; ++i) {
         if (ratings[i] == null) continue;
         profRatingsMap[profNames[i]] = ratings[i];
+        profIdsMap[profNames[i]] = ids[i];
     }
 
     for (const row of rows()) {
@@ -60,16 +63,59 @@ async function addRmp(
         nameCol.appendChild(rmpLink);
     }
 
-    return ratings;
+    return [profRatingsMap, profIdsMap] as const;
+}
+
+function createAiDialog() {
+    const dialog = document.createElement("dialog");
+    dialog.style.textAlign = "center";
+    dialog.style.width = "400px";
+    dialog.style.height = "600px";
+    dialog.style.display = "flex";
+    dialog.style.flexDirection = "column";
+    dialog.style.justifyContent = "space-between";
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+
+    const title = document.createElement("h1");
+    title.innerText = "Ask AI";
+    dialog.appendChild(title);
+
+    const response = document.createElement("p");
+    response.style.height = "100%";
+    response.style.textAlign = "left";
+    response.style.overflowY = "scroll";
+    dialog.appendChild(response);
+
+    const inputContainer = document.createElement("div");
+    inputContainer.style.display = "flex";
+    dialog.appendChild(inputContainer);
+
+    const submitButton = document.createElement("button");
+    submitButton.type = "button";
+    submitButton.innerText = "Ask";
+
+    const promptInput = document.createElement("input");
+    promptInput.type = "text";
+    promptInput.style.width = "100%";
+    promptInput.addEventListener("keyup", ev => {
+        if (ev.key === "Enter") submitButton.click();
+    });
+
+    inputContainer.appendChild(promptInput);
+    inputContainer.appendChild(submitButton);
+
+    document.body.appendChild(dialog);
+
+    return [dialog, submitButton, response, promptInput] as const;
 }
 
 let observer: MutationObserver | null = null;
 
 async function main() {
     const page = identifyPage();
-    console.log("Identified page", page);
     const options = (await chrome.storage.local.get([
         "rmp",
+        "rmpAiFeedback",
         "calendarExport",
         "calendarAutoRefresh",
     ] satisfies Array<keyof Options>)) as Options;
@@ -77,6 +123,15 @@ async function main() {
     switch (page.page) {
         case CurrentPage.ClassSchedule:
             {
+                // Stop weird behaviour when escape is pressed
+                document.addEventListener(
+                    "keydown",
+                    ev => {
+                        if (ev.key === "Escape") ev.stopImmediatePropagation();
+                    },
+                    { capture: true },
+                );
+
                 // =======================
                 // Calendar Export Buttons
                 // =======================
@@ -127,7 +182,56 @@ async function main() {
                 if (options.rmp) {
                     const rows =
                         document.querySelectorAll<HTMLTableRowElement>("tr[id*=trCLASS_MTG_VW]");
-                    addRmp(() => rows.values(), 5, false);
+                    const rmpResponse = await addRmp(() => rows.values(), 5, false);
+                    if (rmpResponse != null) {
+                        // ===========
+                        // RMP AI Chat
+                        // ===========
+                        if (options.rmpAiFeedback) {
+                            const ids = rmpResponse[1];
+                            for (const row of rows.values()) {
+                                const name = (
+                                    (row.children[5] as HTMLTableColElement)
+                                        .children[0] as HTMLDivElement
+                                ).innerText;
+                                if (name && name in ids) {
+                                    // prettier-ignore
+                                    const classParent: string =
+                                        // @ts-expect-error
+                                        row.parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            // @ts-expect-error
+                                            .parentElement.parentElement.children[0].innerText;
+                                    const [courseCode, courseName] = classParent.split(" - ");
+                                    const aiButton = document.createElement("button");
+                                    aiButton.type = "button";
+                                    aiButton.style.width = "100%";
+                                    aiButton.innerText = "Ask AI";
+                                    aiButton.onclick = async () => {
+                                        const [dialog, sendButton, responseArea, input] =
+                                            createAiDialog();
+                                        sendButton.addEventListener("click", async () => {
+                                            if (input.value.trim().length === 0) return;
+
+                                            const { response } =
+                                                await chrome.runtime.sendMessage<ExtensionEvent>({
+                                                    event: EventType.ProfessorAiCompletion,
+                                                    courseCode: courseCode.replaceAll(" ", ""),
+                                                    courseName,
+                                                    professorId: ids[name],
+                                                    prompt: input.value.trim(),
+                                                });
+
+                                            responseArea.innerText = response;
+                                        });
+                                        dialog.showModal();
+                                    };
+                                    row.children[5].appendChild(aiButton);
+                                }
+                            }
+                        }
+                    }
                 }
             }
             break;

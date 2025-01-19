@@ -5,6 +5,7 @@ export const enum EventType {
     GooglePush,
     RmpBasicMulti,
     WeeklyCalendar,
+    ProfessorAiCompletion,
 }
 
 export interface GoogleCalendarList {
@@ -21,4 +22,16 @@ export interface RmpBasicMulti {
     names: string[];
 }
 
-export type ExtensionEvent = GoogleCalendarList | GooglePush | RmpBasicMulti;
+export interface ProfessorAiCompletion {
+    event: EventType.ProfessorAiCompletion;
+    professorId: string;
+    courseCode: string;
+    courseName: string;
+    prompt: string;
+}
+
+export type ExtensionEvent =
+    | GoogleCalendarList
+    | GooglePush
+    | RmpBasicMulti
+    | ProfessorAiCompletion;
