@@ -14,7 +14,6 @@
         "@tsconfig/svelte": "^5.0.4",
         "@types/chrome": "^0.0.297",
         "@types/node": "^22.10.7",
-        "googleapis": "^144.0.0",
         "ics": "^3.8.1",
         "prettier": "^3.4.2",
         "prettier-plugin-svelte": "^3.3.3",
