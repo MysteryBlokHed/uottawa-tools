@@ -4,6 +4,7 @@ import { readSchedule } from "../utils/export-classes.js";
 export enum CurrentPage {
     Unknown = -1,
     ClassSchedule,
+    ClassSelector,
 }
 
 export interface BasePageMeta {
@@ -19,14 +20,29 @@ export interface ClassScheduleMeta extends BasePageMeta {
     classes: Class[];
 }
 
-export type PageMeta = UnknownPageMeta | ClassScheduleMeta;
+export interface ClassSelector extends BasePageMeta {
+    page: CurrentPage.ClassSelector;
+    rows: HTMLTableRowElement[];
+}
+
+export type PageMeta = UnknownPageMeta | ClassScheduleMeta | ClassSelector;
 
 export function identifyPage(): PageMeta {
-    const classes = readSchedule();
-    if (classes?.[0] != null)
-        return {
-            page: CurrentPage.ClassSchedule,
-            classes,
-        };
+    // Class schedule page
+    {
+        const classes = readSchedule();
+        if (classes?.[0] != null)
+            return {
+                page: CurrentPage.ClassSchedule,
+                classes,
+            };
+    }
+
+    // Class selection page
+    {
+        const rows = document.querySelectorAll<HTMLTableRowElement>("[id*=trSSR_CLSRCH_MTG1]");
+        if (rows.length) return { page: CurrentPage.ClassSelector, rows: Array.from(rows) };
+    }
+
     return { page: CurrentPage.Unknown };
 }

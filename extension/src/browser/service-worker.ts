@@ -50,7 +50,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
             case EventType.RmpBasicMulti:
                 {
                     // Try to find professors by name
-                    let professorEntries: Professor[];
+                    let professorEntries: Array<Professor | null>;
                     try {
                         professorEntries = await findProfsByName(message.names);
                     } catch (e) {
@@ -62,6 +62,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                     // Only include professors whose names are an exact match
                     const validIndices = professorEntries
                         .map((professor, i) => {
+                            if (!professor) return null;
                             if (`${professor.firstName} ${professor.lastName}` != message.names[i])
                                 return null;
                             return i;
@@ -69,7 +70,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                         .filter(i => i != null);
 
                     if (validIndices.length === 0) {
-                        sendResponse({ success: true, ratings: Array(professorEntries.length).fill(null) });
+                        sendResponse({
+                            success: true,
+                            ratings: Array(professorEntries.length).fill(null),
+                        });
                         return;
                     }
 
