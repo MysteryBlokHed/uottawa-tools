@@ -18,12 +18,15 @@ class ProfessorRating(TypedDict):
     comment: str
 
 
+RawRatings = dict[Literal["edges"], list[dict[Literal["node"], ProfessorRating]]]
+
+
 class ProfessorInfo(TypedDict):
     firstName: str
     lastName: str
     avgRating: float
     avgDifficulty: float
-    ratings: dict[Literal["edges"], list[dict[Literal["node"], ProfessorRating]]]
+    ratings: RawRatings
 
 
 def create_graphql_query(*, id: str, course: str | None):
