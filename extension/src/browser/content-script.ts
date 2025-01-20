@@ -1,9 +1,16 @@
-import { EventType, type ExtensionEvent } from "./messaging.js";
+import {
+    ExtensionEventType,
+    IncomingExtensionEventType,
+    type ExtensionEvent,
+    type IncomingExtensionEvent,
+} from "./messaging.js";
 import { CurrentPage, identifyPage } from "./page-info.js";
 import { classToEvents } from "../utils/export-classes.js";
 import { createEvents } from "../utils/ics.js";
 import type { BasicRating } from "../utils/rmp.js";
 import type { Options } from "../stores.js";
+
+type MessageListener = Parameters<(typeof chrome)["runtime"]["onMessage"]["addListener"]>[0];
 
 async function addRmp(
     rows: () => Iterable<HTMLTableRowElement>,
@@ -21,7 +28,7 @@ async function addRmp(
 
     // Request basic prof ratings
     const profRatingsResponse = await chrome.runtime.sendMessage<ExtensionEvent>({
-        event: EventType.RmpBasicMulti,
+        event: ExtensionEventType.RmpBasicMulti,
         names: profNames,
     });
     if (!profRatingsResponse.success) return null;
@@ -66,7 +73,11 @@ async function addRmp(
     return [profRatingsMap, profIdsMap] as const;
 }
 
-function createAiDialog() {
+/**
+ * Create the dialog used to communicate with the AI.
+ * @param chromeListener The event listener for streamed responses. Used to kill the listener once the dialog is closed
+ */
+function createAiDialog(chromeListener: MessageListener) {
     const dialog = document.createElement("dialog");
     dialog.style.textAlign = "center";
     dialog.style.width = "400px";
@@ -74,7 +85,14 @@ function createAiDialog() {
     dialog.style.display = "flex";
     dialog.style.flexDirection = "column";
     dialog.style.justifyContent = "space-between";
-    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    dialog.addEventListener(
+        "close",
+        () => {
+            dialog.remove();
+            chrome.runtime.onMessage.removeListener(chromeListener);
+        },
+        { once: true },
+    );
 
     const title = document.createElement("h1");
     title.innerText = "Ask AI";
@@ -167,7 +185,7 @@ async function main() {
                     googleCalButton.innerText = "Export to Google Calendar";
                     googleCalButton.onclick = async () => {
                         await chrome.runtime.sendMessage<ExtensionEvent>({
-                            event: EventType.GooglePush,
+                            event: ExtensionEventType.GooglePush,
                             classes: page.classes,
                         });
                     };
@@ -209,21 +227,56 @@ async function main() {
                                     aiButton.style.width = "100%";
                                     aiButton.innerText = "Ask AI";
                                     aiButton.onclick = async () => {
+                                        // Set up listener for stream response
+                                        const listener = ((message: IncomingExtensionEvent) => {
+                                            switch (message.event) {
+                                                case IncomingExtensionEventType.ProfessorAiStreamStart:
+                                                    responseArea.innerText = '';
+                                                    break;
+                                                case IncomingExtensionEventType.ProfessorAiStreamChunk:
+                                                    responseArea.innerText += message.delta;
+                                                    break;
+                                                case IncomingExtensionEventType.ProfessorAiStreamEnd:
+                                                    aiButton.disabled = false;
+                                                    break;
+                                                case IncomingExtensionEventType.ProfessorAiStreamFail:
+                                                    console.error(
+                                                        "Error getting AI completion:",
+                                                        message.reason,
+                                                    );
+                                                    responseArea.innerHTML =
+                                                        '<span style="color: red;">Failed to get AI response</span>';
+                                                    aiButton.disabled = false;
+                                                    break;
+                                            }
+                                        }) satisfies MessageListener;
+                                        chrome.runtime.onMessage.addListener(listener);
+
                                         const [dialog, sendButton, responseArea, input] =
-                                            createAiDialog();
+                                            createAiDialog(listener);
                                         sendButton.addEventListener("click", async () => {
                                             if (input.value.trim().length === 0) return;
+                                            responseArea.innerHTML =
+                                                '<span style="color: gray;">Waiting for response...</span>';
 
-                                            const { response } =
+                                            const response =
                                                 await chrome.runtime.sendMessage<ExtensionEvent>({
-                                                    event: EventType.ProfessorAiCompletion,
+                                                    event: ExtensionEventType.ProfessorAiCompletion,
                                                     courseCode: courseCode.replaceAll(" ", ""),
                                                     courseName,
                                                     professorId: ids[name],
                                                     prompt: input.value.trim(),
                                                 });
 
-                                            responseArea.innerText = response;
+                                            if (!response.success) {
+                                                console.error(
+                                                    "Unsuccessful response from service worker",
+                                                    response,
+                                                );
+                                                responseArea.innerHTML =
+                                                    '<span style="color: red;">Failed to communicate with backend</span>';
+                                                return;
+                                            }
                                         });
                                         dialog.showModal();
                                     };

@@ -1,5 +1,10 @@
 /// <reference lib="webworker" />
-import { EventType, type ExtensionEvent } from "./messaging.js";
+import {
+    ExtensionEventType,
+    type IncomingExtensionEvent,
+    IncomingExtensionEventType,
+    type ExtensionEvent,
+} from "./messaging.js";
 import { bulkCreateEvents } from "../utils/google.js";
 import {
     findProfsByName,
@@ -10,11 +15,11 @@ import {
 
 const AI_ENDPOINT = "http://127.0.0.1:8000";
 
-chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendResponse) => {
     (async () => {
         console.log("Got message:", message);
         switch (message.event) {
-            case EventType.GoogleCalendarList:
+            case ExtensionEventType.GoogleCalendarList:
                 {
                     console.log("Received request to get Google Calendar list");
 
@@ -46,7 +51,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                     }
                 }
                 break;
-            case EventType.GooglePush:
+            case ExtensionEventType.GooglePush:
                 {
                     console.log("Received request to sync to Google Calendar");
                     const { googleCalendarId } = await chrome.storage.local.get("googleCalendarId");
@@ -78,7 +83,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                     sendResponse({ success: true });
                 }
                 break;
-            case EventType.RmpBasicMulti:
+            case ExtensionEventType.RmpBasicMulti:
                 {
                     // Try to find professors by name
                     let professorEntries: Array<Professor | null>;
@@ -137,23 +142,54 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                     sendResponse({ success: true, ratings: professorRatings, ids: professorIds });
                 }
                 break;
-            case EventType.ProfessorAiCompletion:
+            case ExtensionEventType.ProfessorAiCompletion: {
                 console.log("Getting AI completion for professor info");
-                try {
-                    const response = await fetch(
-                        `${AI_ENDPOINT}/prof_feedback/${encodeURIComponent(message.professorId)}/${encodeURIComponent(message.courseCode)}/${encodeURIComponent(message.courseName)}/${encodeURIComponent(message.prompt)}`,
-                        { headers: { "Access-Control-Allow-Origin": "*" } },
-                    ).then(r => r.json());
-                    if (!response) throw new Error("Empty response from endpoint");
-                    sendResponse({ success: true, response });
-                } catch (e) {
-                    console.error("Failed to get AI completion", e);
+                const response = await fetch(
+                    `${AI_ENDPOINT}/stream_prof_feedback/${encodeURIComponent(message.professorId)}/${encodeURIComponent(message.courseCode)}/${encodeURIComponent(message.courseName)}/${encodeURIComponent(message.prompt)}`,
+                    { headers: { "Access-Control-Allow-Origin": "*" } },
+                );
+                if (response.status !== 200 || !response.body)
+                    throw new TypeError("Non-200 response from API");
+                const reader = response.body.getReader();
+                const tabId = sender.tab?.id;
+                if (tabId == null) {
                     sendResponse({ success: false });
                     return;
                 }
+                sendResponse({ success: true });
+
+                // Stream response back to client
+                try {
+                    const decoder = new TextDecoder();
+                    chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                        event: IncomingExtensionEventType.ProfessorAiStreamStart,
+                    });
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) {
+                            chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                                event: IncomingExtensionEventType.ProfessorAiStreamEnd,
+                            });
+                            break;
+                        }
+                        chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                            event: IncomingExtensionEventType.ProfessorAiStreamChunk,
+                            delta: decoder.decode(value),
+                        });
+                    }
+                } catch (e) {
+                    console.error("Failed to get AI completion", e);
+                    chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                        event: IncomingExtensionEventType.ProfessorAiStreamFail,
+                        reason: e,
+                    });
+                    return;
+                }
                 break;
+            }
             default:
                 sendResponse({ success: false });
+                break;
         }
     })();
     return true;

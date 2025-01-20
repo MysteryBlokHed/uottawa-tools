@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { EventType, type ExtensionEvent } from "./browser/messaging";
+    import { ExtensionEventType, type ExtensionEvent } from "./browser/messaging";
     import type { Options } from "./stores";
 
     let options: Options | null = $state(null);
@@ -42,7 +42,7 @@
     $effect(() => {
         if (!authorized) return;
         window.chrome.runtime.sendMessage<ExtensionEvent>(
-            { event: EventType.GoogleCalendarList },
+            { event: ExtensionEventType.GoogleCalendarList },
             response => {
                 if (response.success) calendars = response.calendars;
             },
