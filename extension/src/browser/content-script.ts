@@ -265,6 +265,8 @@ async function main() {
                                                     responseArea.innerHTML = DOMPurify.sanitize(
                                                         await marked(responseRaw),
                                                     );
+                                                    // Make sure that any link tags open in a new tab
+                                                    for (const anchor of responseArea.getElementsByTagName('a')) anchor.target = '_blank';
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamEnd:
                                                     aiButton.disabled = false;

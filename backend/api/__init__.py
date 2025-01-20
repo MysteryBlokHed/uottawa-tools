@@ -27,21 +27,57 @@ def status() -> dict[Literal["status"], str]:
 
 def format_feedback(feedback: dict[Literal["node"], ProfessorRating]) -> str:
     node = feedback["node"]
-    return f"<userFeedback>\n<clarityRating>{node['clarityRating']}/5.0</clarityRating>\n<difficultyRating>{node['difficultyRating']}/5.0</difficultyRating>\n<helpfulRating>{node['helpfulRating']}/5.0</helpfulRating>\n<comment>{node['comment']}</comment>\n</userFeedback>"
+    return f"""<userFeedback>
+<clarityRating>{node['clarityRating']}/5.0</clarityRating>
+<difficultyRating>{node['difficultyRating']}/5.0</difficultyRating>
+<helpfulRating>{node['helpfulRating']}/5.0</helpfulRating>
+<comment>{node['comment']}</comment>
+</userFeedback>"""
 
 
 def create_prof_feedback_prompt(
-    *, info: ProfessorInfo, course: str, course_display: str
+    *,
+    id: str,
+    info: ProfessorInfo,
+    course: str,
+    course_display: str,
 ) -> list[ChatCompletionMessageParam]:
+    # Used for derived RMP URL, in case users ask for a source
+    numerical_id = base64.b64decode(id).decode()[8:]
+    source_url = f"https://www.ratemyprofessors.com/professor/{numerical_id}"
+
     prompt_comments = "\n".join(map(format_feedback, info["ratings"]["edges"]))
+
     return [
+        # pyright: ignore [reportUnknownVariableType]
         {
             "role": "system",
-            "content": "You are an assistant designed to help users get information on their professors at the University of Ottawa. The following is information on a particular professor. Answer any questions that a user may have about this professor. All ratings are on a five-point scale unless otherwise specified.",
+            "content": (
+                "You are an assistant designed to help users get information on their professors at the University of Ottawa. "
+                "The following is information on a particular professor. "
+                "Answer any questions that a user may have about this professor.\n\n"
+                "If a user asks where the data came from, or for this professor's page, you should provide the full `siteUrl` key."
+            ),
         },
         {
             "role": "system",
-            "content": f"<professorName>{info['firstName']} {info['lastName']}</professorName>\n<avgRating>{info['avgRating']}</avgRating>\n<avgDifficulty>{info['avgDifficulty']}</avgDifficulty>\n<courseCode>{course}</courseCode>\n<courseCodeDisplay>{course_display}</courseCodeDisplay>\n<userFeedbackSection>\n{prompt_comments}\n</userFeedbackSection>",
+            "content": f"""<dataSourceSection>
+<siteName>Rate My Professors</siteName>
+<siteUrl>{source_url}</siteUrl>
+</dataSourceSection>
+<professorDetailsSection>
+<professorName>{info['firstName']} {info['lastName']}</professorName>
+<avgRating>{info['avgRating']}</avgRating>
+<avgDifficulty>{info['avgDifficulty']}</avgDifficulty>
+<wouldTakeAgainPercent>{info['wouldTakeAgainPercent']:.2f}<wouldTakeAgainPercent>
+</professorDetailsSection>
+<courseDetailsSection>
+<courseCode>{course}</courseCode>
+<courseDisplayName>{course_display}</courseDisplayName>
+</courseDetailsSection>
+<userFeedbackSection>
+{prompt_comments}
+</userFeedbackSection>""",
         },
     ]
 
@@ -83,7 +119,10 @@ async def stream_prof_feedback(id: str, course: str, course_display: str, prompt
     return StreamingResponse(
         generate_stream(
             messages=create_prof_feedback_prompt(
-                info=info, course=course, course_display=course_display
+                id=id,
+                info=info,
+                course=course,
+                course_display=course_display,
             )
             + [
                 {"role": "user", "content": prompt},

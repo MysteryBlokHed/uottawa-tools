@@ -26,6 +26,7 @@ class ProfessorInfo(TypedDict):
     lastName: str
     avgRating: float
     avgDifficulty: float
+    wouldTakeAgainPercent: float
     ratings: RawRatings
 
 
@@ -33,7 +34,7 @@ def create_graphql_query(*, id: str, course: str | None):
     course_filter = (
         f", courseFilter: {json.dumps(course)}" if course is not None else ""
     )
-    return f"""query {{ node(id: {json.dumps(id)} ) {{ ... on Teacher {{ firstName lastName avgRating avgDifficulty ratings(first: 25{course_filter}) {{ edges {{ node {{ comment helpfulRating difficultyRating clarityRating }} }} }} }} }}  }}"""
+    return f"""query {{ node(id: {json.dumps(id)} ) {{ ... on Teacher {{ firstName lastName avgRating avgDifficulty wouldTakeAgainPercent ratings(first: 25{course_filter}) {{ edges {{ node {{ comment helpfulRating difficultyRating clarityRating }} }} }} }} }}  }}"""
 
 
 async def get_professor_info(
