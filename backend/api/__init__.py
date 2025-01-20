@@ -46,44 +46,13 @@ def create_prof_feedback_prompt(
     ]
 
 
-@app.get(
-    "/prof_feedback/{id}/{course}/{course_display}/{prompt}",
-    description="Uses AI to get information about a professor based on Rate My Professors comments.",
-    response_description="The LLM completion result.",
-    responses={
-        404: {"description": "Professor feedback not found."},
-        503: {"description": "Empty completion from AI."},
-    },
-)
-async def get_prof_feedback(
-    id: str, course: str, course_display: str, prompt: str
-) -> str:
-    # Get comments about prof
-    async with aiohttp.ClientSession() as session:
-        info = await get_professor_info(client=session, id=id, course=course)
-    if info is None:
-        raise HTTPException(status_code=404, detail="Professor feedback not found.")
-
-    # Get AI completion (not streamed)
-    chat_completion = await openai.chat.completions.create(
-        messages=create_prof_feedback_prompt(
-            info=info, course=course, course_display=course_display
-        )
-        + [
-            {"role": "user", "content": prompt},
-        ],
-        model=AI_MODEL,
-        temperature=0.5,
-    )
-    result = chat_completion.choices[0].message.content
-    if result is None:
-        raise HTTPException(status_code=503, detail="Empty completion from AI.")
-    return result
-
-
 async def generate_stream(*, messages: Iterable[ChatCompletionMessageParam]):
     stream = await openai.chat.completions.create(
-        messages=messages, model=AI_MODEL, temperature=0.5, stream=True
+        messages=messages,
+        model=AI_MODEL,
+        temperature=0.5,
+        stream=True,
+        max_tokens=1000,
     )
     async for chunk in stream:
         content = chunk.choices[0].delta.content
