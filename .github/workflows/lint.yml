@@ -55,6 +55,8 @@ jobs:
       - name: Lint extension/
         run: |
           cd extension
+          corepack enable
+          corepack install
           pnpm install
           pnpm run lint
           pnpm run check
