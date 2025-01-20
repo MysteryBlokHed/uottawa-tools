@@ -2,9 +2,7 @@
 
 This is a simple HTTP API, used to get AI completions for the "Ask AI" feature.
 
-## Setup
-
-### API Keys
+## API Keys
 
 This code will work with any OpenAI-compatible backend.
 The project expects the following env variables:
@@ -18,7 +16,18 @@ OPENAI_KEY=abcd
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-### Dependencies
+## Quick start
+
+You can just run `run.sh` to start the server, which will set up a virtual environment
+and install the project's dependencies:
+
+```sh
+./run.sh
+```
+
+Otherwise:
+
+## Dependencies
 
 First, it's best to create a new virtual environment:
 
