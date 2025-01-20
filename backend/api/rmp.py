@@ -1,10 +1,10 @@
 """Wrappers around Rate My Professors APIs."""
 
-from typing import Any, Literal, TypedDict
-import requests
+import aiohttp
 
 import base64
 import json
+from typing import Any, Literal, TypedDict
 
 ENDPOINT = "https://www.ratemyprofessors.com/graphql"
 AUTH = f"Basic {base64.b64encode('test:test'.encode('utf-8')).decode()}"
@@ -36,8 +36,10 @@ def create_graphql_query(*, id: str, course: str | None):
     return f"""query {{ node(id: {json.dumps(id)} ) {{ ... on Teacher {{ firstName lastName avgRating avgDifficulty ratings(first: 25{course_filter}) {{ edges {{ node {{ comment helpfulRating difficultyRating clarityRating }} }} }} }} }}  }}"""
 
 
-def get_professor_info(id: str, course: str) -> ProfessorInfo | None:
-    r = requests.post(
+async def get_professor_info(
+    *, client: aiohttp.ClientSession, id: str, course: str
+) -> ProfessorInfo | None:
+    r = await client.post(
         ENDPOINT,
         headers={
             "Accept": "*/*",
@@ -47,13 +49,13 @@ def get_professor_info(id: str, course: str) -> ProfessorInfo | None:
         },
         json={"query": create_graphql_query(id=id, course=course)},
     )
-    response = r.json()
+    response = await r.json()
     if "errors" in response:
         return None
     ratings: list[Any] = response["data"]["node"]["ratings"]["edges"]
     if len(ratings) == 0:
         # Do request without course filter
-        r = requests.post(
+        r = await client.post(
             ENDPOINT,
             headers={
                 "Accept": "*/*",
@@ -63,7 +65,7 @@ def get_professor_info(id: str, course: str) -> ProfessorInfo | None:
             },
             json={"query": create_graphql_query(id=id, course=None)},
         )
-        response = r.json()
+        response = await r.json()
         if "errors" in response:
             return None
 

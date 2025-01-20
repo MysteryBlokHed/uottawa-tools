@@ -1,10 +1,11 @@
-from typing import Literal
+import aiohttp
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 
 import os
+from typing import Literal
 
 from .rmp import *
 
@@ -16,6 +17,8 @@ AI_MODEL = os.environ["OPENAI_MODEL"]
 openai = AsyncOpenAI(
     base_url=os.environ.get("OPENAI_ENDPOINT"), api_key=os.environ["OPENAI_KEY"]
 )
+
+aio_client = aiohttp.ClientSession()
 
 
 @app.get("/", description="Basic endpoint to verify that the API is running.")
@@ -57,7 +60,7 @@ async def get_prof_feedback(
     id: str, course: str, course_display: str, prompt: str
 ) -> str:
     # Get comments about prof
-    info = get_professor_info(id, course)
+    info = await get_professor_info(client=aio_client, id=id, course=course)
     if info is None:
         raise HTTPException(status_code=404, detail="Professor feedback not found.")
 
