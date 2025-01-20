@@ -1,5 +1,5 @@
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 
 import {
     ExtensionEventType,
@@ -230,9 +230,11 @@ async function main() {
                                     aiButton.style.width = "100%";
                                     aiButton.innerText = "Ask AI";
                                     aiButton.onclick = async () => {
-                                        let responseRaw = '';
+                                        let responseRaw = "";
                                         // Set up listener for stream response
-                                        const listener = (async (message: IncomingExtensionEvent) => {
+                                        const listener = (async (
+                                            message: IncomingExtensionEvent,
+                                        ) => {
                                             switch (message.event) {
                                                 case IncomingExtensionEventType.ProfessorAiStreamStart:
                                                     responseArea.innerText = responseRaw;
@@ -241,7 +243,9 @@ async function main() {
                                                     responseRaw += message.delta;
                                                     // It seems quite inefficient to re-process the whole stream for every chunk, but it doesn't cause
                                                     // any noticeable lag so seems fine
-                                                    responseArea.innerHTML = DOMPurify.sanitize(await marked(responseRaw));
+                                                    responseArea.innerHTML = DOMPurify.sanitize(
+                                                        await marked(responseRaw),
+                                                    );
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamEnd:
                                                     aiButton.disabled = false;
