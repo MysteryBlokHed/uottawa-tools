@@ -1,4 +1,3 @@
-import * as ics from "./ics";
 import type { EventAttributes } from "ics";
 
 export interface ClassEvent {
@@ -89,12 +88,12 @@ export function readSchedule() {
         const [startHour, startMinute] = timeTo24Hour(
             parseInt(startHourStr),
             parseInt(startMinuteStr),
-            startPeriod as any,
+            startPeriod as 'AM' | 'PM',
         );
         const [endHour, endMinute] = timeTo24Hour(
             parseInt(endHourStr),
             parseInt(endMinuteStr),
-            endPeriod as any,
+            endPeriod as 'AM' | 'PM',
         );
 
         startDate.setHours(startHour);

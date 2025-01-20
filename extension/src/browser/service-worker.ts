@@ -33,9 +33,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                         const response = await fetch(
                             "https://www.googleapis.com/calendar/v3/users/me/calendarList",
                             {
-                                headers: {
-                                    Authorization: `Bearer ${token.token}`,
-                                },
+                                headers: { Authorization: `Bearer ${token.token}` },
                             },
                         ).then(r => r.json());
                         if (response.items)
@@ -153,6 +151,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, _sender, sendResp
                     sendResponse({ success: false });
                     return;
                 }
+                break;
             default:
                 sendResponse({ success: false });
         }

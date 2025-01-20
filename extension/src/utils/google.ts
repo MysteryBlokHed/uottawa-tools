@@ -1,4 +1,4 @@
-import type { ClassEvent, Class } from "./export-classes";
+import type { Class } from "./export-classes";
 
 const BATCH_ENDPOINT = "https://www.googleapis.com/batch/calendar/v3";
 

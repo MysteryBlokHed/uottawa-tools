@@ -4,7 +4,7 @@
 
     let options: Options | null = $state(null);
     async function initializeOptions() {
-        options = (await chrome.storage.local.get([
+        options = (await window.chrome.storage.local.get([
             "rmp",
             "rmpAiFeedback",
             "calendarExport",
@@ -20,11 +20,11 @@
 
     $effect(() => {
         if (!options) return;
-        chrome.storage.local.set(options);
+        window.chrome.storage.local.set(options);
     });
 
     let authorized: boolean | null = $state(null);
-    chrome.identity
+    window.chrome.identity
         .getAuthToken({ interactive: false })
         .then(token => {
             if (token.token) authorized = true;
@@ -32,10 +32,16 @@
         })
         .catch(() => (authorized = false));
 
-    let calendars: any[] | null = $state(null);
+    interface Calendar {
+        accessRole: string;
+        id: string;
+        summary: string;
+    }
+
+    let calendars: Calendar[] | null = $state(null);
     $effect(() => {
         if (!authorized) return;
-        chrome.runtime.sendMessage<ExtensionEvent>(
+        window.chrome.runtime.sendMessage<ExtensionEvent>(
             { event: EventType.GoogleCalendarList },
             response => {
                 if (response.success) calendars = response.calendars;
@@ -44,7 +50,7 @@
     });
 
     async function enableSync() {
-        const token = await chrome.identity.getAuthToken({ interactive: true });
+        const token = await window.chrome.identity.getAuthToken({ interactive: true });
         if (token.token) authorized = true;
     }
 </script>

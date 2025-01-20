@@ -139,7 +139,7 @@ async function main() {
                     const row =
                         document.querySelector<HTMLTableRowElement>("tr[id*=trCLASS_MTG_VW]");
                     const btnContainer =
-                        // @ts-expect-error This UI is terrible and this is the best idea I've got
+                        // @ts-expect-error Trust these elements exist
                         row.parentElement.parentElement.parentElement.parentElement.parentElement
                             .parentElement.parentElement.parentElement.parentElement.parentElement
                             .parentElement.parentElement.parentElement.parentElement.parentElement
@@ -165,8 +165,8 @@ async function main() {
                     googleCalButton.type = "button";
                     googleCalButton.style.width = "100%";
                     googleCalButton.innerText = "Export to Google Calendar";
-                    googleCalButton.onclick = async ev => {
-                        const response = await chrome.runtime.sendMessage<ExtensionEvent>({
+                    googleCalButton.onclick = async () => {
+                        await chrome.runtime.sendMessage<ExtensionEvent>({
                             event: EventType.GooglePush,
                             classes: page.classes,
                         });
@@ -197,11 +197,11 @@ async function main() {
                                 if (name && name in ids) {
                                     // prettier-ignore
                                     const classParent: string =
-                                        // @ts-expect-error
+                                        // @ts-expect-error Trust these elements exist
                                         row.parentElement.parentElement.parentElement.parentElement
                                             .parentElement.parentElement.parentElement.parentElement
                                             .parentElement.parentElement.parentElement.parentElement
-                                            // @ts-expect-error
+                                            // @ts-expect-error Trust these elements exist
                                             .parentElement.parentElement.children[0].innerText;
                                     const [courseCode, courseName] = classParent.split(" - ");
                                     const aiButton = document.createElement("button");

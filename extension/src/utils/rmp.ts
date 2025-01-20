@@ -16,7 +16,7 @@ export interface BasicRating {
     avgDifficulty: number;
 }
 
-async function sendQuery(query: string, extra?: any): Promise<unknown> {
+async function sendQuery(query: string, extra?: object): Promise<unknown> {
     const response = await fetch(ENDPOINT, {
         method: "POST",
         body: JSON.stringify({ query, ...extra }),
@@ -49,6 +49,7 @@ export async function findProfsByName(names: readonly string[]): Promise<Array<P
         )
         .join("\n");
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = (await sendQuery(`query { ${requests} }`)) as any;
     if (response.errors) throw response.errors;
     // Convert responses into array
@@ -57,6 +58,7 @@ export async function findProfsByName(names: readonly string[]): Promise<Array<P
     );
     data.sort(([a], [b]) => a - b);
     return data.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ([, value]) => (value as any).teachers.edges[0]?.node || null,
     ) as Array<Professor | null>;
 }
@@ -75,6 +77,7 @@ export async function getBasicRatings(ids: readonly string[]): Promise<BasicRati
         )
         .join("\n");
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = (await sendQuery(`query { ${requests} }`)) as any;
     if (response.errors) throw response.errors;
     // Convert responses into array
@@ -82,5 +85,5 @@ export async function getBasicRatings(ids: readonly string[]): Promise<BasicRati
         ([key, value]) => [parseInt(key.slice(1)), value] as const,
     );
     data.sort(([a], [b]) => a - b);
-    return data.map(([, value]) => value as any) as BasicRating[];
+    return data.map(([, value]) => value as BasicRating);
 }
