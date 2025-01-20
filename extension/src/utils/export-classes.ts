@@ -88,12 +88,12 @@ export function readSchedule() {
         const [startHour, startMinute] = timeTo24Hour(
             parseInt(startHourStr),
             parseInt(startMinuteStr),
-            startPeriod as 'AM' | 'PM',
+            startPeriod as "AM" | "PM",
         );
         const [endHour, endMinute] = timeTo24Hour(
             parseInt(endHourStr),
             parseInt(endMinuteStr),
-            endPeriod as 'AM' | 'PM',
+            endPeriod as "AM" | "PM",
         );
 
         startDate.setHours(startHour);

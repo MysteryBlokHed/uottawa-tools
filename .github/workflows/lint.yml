@@ -1,0 +1,68 @@
+name: Lint Project
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - backend/**/*
+      - extension/**/*
+  push:
+    branches:
+      - main
+    paths:
+      - backend/**/*
+      - extension/**/*
+
+jobs:
+  lint:
+    name: Lint Project
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: pnpm cache
+        uses: actions/cache@v4
+        id: pnpm-cache
+        with:
+          path: |
+            ~/.local/share/pnpm/store/v3/
+            extension/node_modules/.cache/prettier/
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            $ {{ runner.os }}-pnpm-
+
+      - name: pip cache
+        uses: actions/cache@v4
+        id: pip-cache
+        with:
+          path: ~/.cache/pip/
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Lint extension/
+        run: |
+          cd extension
+          pnpm install
+          pnpm run lint
+          pnpm run check
+          cd ..
+
+      - name: Lint backend/
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          python -m black . --check
+          cd ..

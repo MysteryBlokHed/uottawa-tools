@@ -52,7 +52,9 @@ export function identifyPage(): PageMeta {
 
     // Weekly calendar
     {
-        const container = document.querySelector<HTMLDivElement>("div[id*=DERIVED_CLASS_S_MONDAY_LBL]");
+        const container = document.querySelector<HTMLDivElement>(
+            "div[id*=DERIVED_CLASS_S_MONDAY_LBL]",
+        );
         if (container != null)
             return { page: CurrentPage.WeeklyCalendar, filtersContainer: container };
     }

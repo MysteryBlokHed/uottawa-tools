@@ -21,7 +21,6 @@ The chrome extension will be generated in the `dist/` directory.
 With developer mode enabled for Chrome extensions, you can enable this extension
 by clicking "Load unpacked" and then selecting the `dist/` folder.
 
-
 ## Setting up Google OAuth2
 
 This project requires a valid OAuth2 Client ID for the Google Calendar sync feature.
