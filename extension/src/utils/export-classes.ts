@@ -200,7 +200,7 @@ export function classToEvents(classInfo: Class): EventAttributes[] {
     return components.map<EventAttributes>(component => {
         const { startDate, endEventDate, endRecurDate } = component.event;
 
-        const recurrenceEnd = `${endRecurDate.getUTCFullYear().toString()}${(endRecurDate.getUTCMonth() + 1).toString().padStart(2, "0")}${endRecurDate.getUTCDate().toString().padStart(2, "0")}000000Z`;
+        const recurrenceEnd = `${endRecurDate.getUTCFullYear().toString()}${(endRecurDate.getUTCMonth() + 1).toString().padStart(2, "0")}${endRecurDate.getUTCDate().toString().padStart(2, "0")}T000000Z`;
 
         return {
             title: `${code} ${name} ${component.component}`,
