@@ -1,6 +1,6 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from groq import Groq
+from openai import OpenAI
 
 import os
 
@@ -9,8 +9,9 @@ from rmp import *
 _ = load_dotenv()
 
 app = FastAPI()
-groq = Groq(api_key=os.environ["GROQ_KEY"])
 
+AI_MODEL = os.environ["OPENAI_MODEL"]
+openai = OpenAI(base_url=os.environ.get("OPENAI_ENDPOINT"),api_key=os.environ["OPENAI_KEY"])
 
 @app.get("/", description="Basic endpoint to verify that the API is running.")
 def read_root():
@@ -35,7 +36,7 @@ def do_stuff(id: str, course: str, course_display: str, prompt: str):
     # Groq completion
     prompt_comments = "\n".join(map(format_feedback, comments["ratings"]["edges"]))
 
-    chat_completion = groq.chat.completions.create(
+    chat_completion = openai.chat.completions.create(
         messages=[
             {
                 "role": "system",
@@ -47,7 +48,7 @@ def do_stuff(id: str, course: str, course_display: str, prompt: str):
             },
             {"role": "user", "content": prompt},
         ],
-        model="llama-3.3-70b-versatile",
-        temperature=0.1,
+        model=AI_MODEL,
+        temperature=0.5,
     )
     return chat_completion.choices[0].message.content
