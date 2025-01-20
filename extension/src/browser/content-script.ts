@@ -130,7 +130,7 @@ function createAiDialog(chromeListener: MessageListener) {
     return [dialog, submitButton, response, promptInput] as const;
 }
 
-let observer: MutationObserver | null = null;
+const unknownObserver = new MutationObserver(main);
 
 async function main() {
     const page = identifyPage();
@@ -141,17 +141,33 @@ async function main() {
         "calendarAutoRefresh",
     ] satisfies Array<keyof Options>)) as Options;
 
+    if (page.page !== CurrentPage.Unknown) unknownObserver.disconnect();
+    else if (page.page === CurrentPage.Unknown) unknownObserver.observe(document.body, { attributes: true, childList: true });
+
     switch (page.page) {
         case CurrentPage.ClassSchedule:
             {
-                // Stop weird behaviour when escape is pressed
+                // Stop weird behaviour when certain keys are pressed
                 document.addEventListener(
                     "keydown",
                     ev => {
-                        if (ev.key === "Escape") ev.stopImmediatePropagation();
+                        if (ev.key === "Escape" || ev.key === "Enter")
+                            ev.stopImmediatePropagation();
                     },
                     { capture: true },
                 );
+
+                // Add specialized listener in case this page is overwritten
+                const observer = new MutationObserver(mutationList => {
+                    // This is the only thing I could find that reliably triggered a rerender at the right time
+                    if (mutationList.length === 3) {
+                        observer.disconnect();
+                        main();
+                    }
+                });
+                // For whatever reason, a style is added while the page is refreshing and then removed when it's done.
+                // This can be used to identify when the page is done refreshing
+                observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
 
                 // =======================
                 // Calendar Export Buttons
@@ -338,12 +354,6 @@ async function main() {
                 }
             }
             break;
-    }
-
-    if (page.page !== CurrentPage.Unknown && observer != null) observer.disconnect();
-    else if (page.page === CurrentPage.Unknown && observer == null) {
-        observer = new MutationObserver(() => main());
-        observer.observe(document.body, { attributes: true, childList: true });
     }
 }
 

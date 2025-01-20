@@ -12,7 +12,6 @@ export async function bulkCreateEvents(
             classInfo.components.flatMap(component => {
                 component.event.endRecurDate = new Date(component.event.endRecurDate);
                 const recurrenceEnd = `${component.event.endRecurDate.getUTCFullYear().toString()}${(component.event.endRecurDate.getUTCMonth() + 1).toString().padStart(2, "0")}${component.event.endRecurDate.getUTCDate().toString().padStart(2, "0")}T000000Z`;
-                console.log(recurrenceEnd);
 
                 return {
                     summary: `${classInfo.code} ${classInfo.name} ${component.component}`,
