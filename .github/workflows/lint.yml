@@ -4,12 +4,14 @@ on:
     branches:
       - main
     paths:
+      - .github/workflows/lint.yml
       - backend/**/*
       - extension/**/*
   push:
     branches:
       - main
     paths:
+      - .github/workflows/lint.yml
       - backend/**/*
       - extension/**/*
 
