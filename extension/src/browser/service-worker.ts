@@ -161,9 +161,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                 // Stream response back to client
                 try {
                     const decoder = new TextDecoder();
-                    chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
-                        event: IncomingExtensionEventType.ProfessorAiStreamStart,
-                    });
+                    let sentStartSignal = false;
                     while (true) {
                         const { value, done } = await reader.read();
                         if (done) {
@@ -172,6 +170,15 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                             });
                             break;
                         }
+
+                        // Wait until the first chunk is actually received before telling the frontend to clear the response field
+                        if (!sentStartSignal) {
+                            sentStartSignal = true;
+                            chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                                event: IncomingExtensionEventType.ProfessorAiStreamStart,
+                            });
+                        }
+
                         chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
                             event: IncomingExtensionEventType.ProfessorAiStreamChunk,
                             delta: decoder.decode(value),

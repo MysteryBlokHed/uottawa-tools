@@ -253,7 +253,10 @@ async function main() {
                                         ) => {
                                             switch (message.event) {
                                                 case IncomingExtensionEventType.ProfessorAiStreamStart:
+                                                    // Reset response area
                                                     responseArea.innerText = responseRaw;
+                                                    // Clear user input
+                                                    input.value = '';
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamChunk:
                                                     responseRaw += message.delta;
@@ -265,6 +268,7 @@ async function main() {
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamEnd:
                                                     aiButton.disabled = false;
+                                                    responseRaw = '';
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamFail:
                                                     console.error(
@@ -281,6 +285,10 @@ async function main() {
 
                                         const [dialog, sendButton, responseArea, input] =
                                             createAiDialog(listener);
+
+                                        // Disable button if input is empty
+                                        input.addEventListener('keypress', ev => aiButton.disabled = ((ev.target as HTMLInputElement).value.trim().length === 0));
+
                                         sendButton.addEventListener("click", async () => {
                                             if (input.value.trim().length === 0) return;
                                             responseArea.innerHTML =
