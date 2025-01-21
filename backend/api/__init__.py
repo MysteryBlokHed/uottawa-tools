@@ -1,11 +1,13 @@
 import aiohttp
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from openai import AsyncOpenAI
 
 import os
 from typing import Literal
+
+from pydantic import BaseModel
 
 from .ai import *
 from .rmp import *
@@ -50,7 +52,6 @@ async def stream_prof_feedback(id: str, course: str, course_display: str, prompt
             client=openai,
             model=AI_MODEL,
             messages=create_prof_feedback_prompt(
-                id=id,
                 info=info,
                 course=course,
                 course_display=course_display,
@@ -58,6 +59,95 @@ async def stream_prof_feedback(id: str, course: str, course_display: str, prompt
             + [
                 {"role": "user", "content": prompt},
             ],
+        ),
+        media_type="text/plain",
+    )
+
+
+class MultiProfessorInfo(BaseModel):
+    id: str
+    course: str
+    course_display: str
+
+
+@app.post(
+    "/stream_multi_prof_feedback/{prompt}",
+    description=(
+        "Uses AI to get information about multiple professors based on Rate My Professors comments. "
+        "Response are streamed instead of being returned all at once."
+    ),
+    response_description="The LLM completion result.",
+    responses={
+        404: {"description": "Professor feedback not found."},
+        503: {"description": "Failure from the AI."},
+    },
+)
+async def stream_multi_prof_feedback(
+    prompt: str,
+    professors: list[MultiProfessorInfo] = Body(
+        # pyright: ignore [reportCallInDefaultInitializer]
+        ...
+    ),
+):
+    async with aiohttp.ClientSession() as session:
+        # Get professor names from IDs
+        prof_data = await get_multi_basic_info(
+            client=session,
+            ids=map(
+                lambda prof: prof.id,
+                professors,
+            ),
+        )
+        if prof_data is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Could not find professor(s) with specified ID(s).",
+            )
+
+        # Create ID->name mapping
+        ids_to_names: dict[str, str] = {}
+        for provided_info, returned_info in zip(professors, prof_data):
+            name = f"{returned_info['firstName']} {returned_info['lastName']}"
+            ids_to_names[name] = provided_info.id
+
+        # Determine which professors we need information on
+        try:
+            identified = await identify_referenced_profs(
+                client=openai,
+                model=AI_MODEL,
+                available_professors=ids_to_names,
+                prompt=prompt,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=503, detail=str(e))
+
+        # Get more detailed information for relevant professors
+        detailed_info = await get_multi_info(client=session, ids=identified)
+        if detailed_info is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Failed to get info for identified professors.",
+            )
+
+    identified_prof_ids = filter(lambda prof: prof.id in identified, professors)
+    multi_prof_context: map[MultiProfContext] = map(
+        lambda x: {
+            "info": x[1],
+            "course": x[0].course,
+            "course_display": x[0].course_display,
+        },
+        zip(identified_prof_ids, detailed_info),
+    )
+
+    # Finally, stream AI completion to frontend
+    return StreamingResponse(
+        generate_stream(
+            client=openai,
+            model=AI_MODEL,
+            messages=(
+                create_multi_prof_feedback_prompt(info=multi_prof_context)
+                + [{"role": "user", "content": prompt}]
+            ),
         ),
         media_type="text/plain",
     )

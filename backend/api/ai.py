@@ -5,7 +5,8 @@ from openai.types.chat import ChatCompletionMessageParam
 
 import base64
 from collections.abc import Iterable
-from typing import Literal
+import json
+from typing import Literal, TypedDict
 
 from .rmp import ProfessorRating, ProfessorInfo
 
@@ -21,9 +22,12 @@ def format_feedback_for_prompt(feedback: dict[Literal["node"], ProfessorRating])
 
 
 def prof_info_to_xml(
-    *, id: str, info: ProfessorInfo, course: str, course_display: str
+    *,
+    info: ProfessorInfo,
+    course: str,
+    course_display: str,
 ) -> str:
-    numerical_id = base64.b64decode(id).decode()[8:]
+    numerical_id = base64.b64decode(info["id"]).decode()[8:]
     source_url = f"https://www.ratemyprofessors.com/professor/{numerical_id}"
 
     prompt_comments = "\n".join(
@@ -51,7 +55,6 @@ def prof_info_to_xml(
 
 def create_prof_feedback_prompt(
     *,
-    id: str,
     info: ProfessorInfo,
     course: str,
     course_display: str,
@@ -69,8 +72,133 @@ def create_prof_feedback_prompt(
         {
             "role": "system",
             "content": prof_info_to_xml(
-                id=id, info=info, course=course, course_display=course_display
+                info=info,
+                course=course,
+                course_display=course_display,
             ),
+        },
+    ]
+
+
+def create_multi_prof_identification_prompt(
+    *,
+    available_professors: Iterable[str],
+) -> list[ChatCompletionMessageParam]:
+    names = "\n".join(
+        map(lambda name: f"<professorName>{name}</professorName>", available_professors)
+    )
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are going to be given a list of professor names. After this, a user prompt will be provided. "
+                "Your task is to determine which of the listed professors are relevant to the user's query. "
+                "If a user specifies a specific professor or professors, return only their names. "
+                "If a user requests information on all professors, return all professors' names. "
+                "If a user requests a professor that is not listed, simply ignore that request.\n\n"
+                "Your response should be a list of strings in a JSON key called `professors`. "
+                "NAMES MUST BE EXACT!! If a user specifies only part of a professor's name, insert the FULL NAME of the closest professor. "
+                "If there are multiple professors with a similar name, include ALL OF THEM."
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"<professorList>\n{names}\n</professorList>",
+        },
+    ]
+
+
+async def identify_referenced_profs(
+    *,
+    client: AsyncOpenAI,
+    model: str,
+    available_professors: dict[str, str],
+    prompt: str,
+) -> list[str]:
+    """Given a list of professors and a user prompt, identifies which professors
+    are relevant to the user's query.
+
+    Args:
+        available_professors: A mapping of professor IDs (keys) to professor names (values).
+        prompt: The user's prompt.
+
+    Raises:
+
+        JSONDecodeError: The AI's response was not valid JSON.
+        TypeError: The AI returned an unexpected JSON format (eg. invalid key), or had no response at all.
+        ValueError: The AI returned professor data that made no sense.
+    Returns: The IDs of the relevant professors.
+    """
+    response = await client.chat.completions.create(
+        messages=create_multi_prof_identification_prompt(
+            available_professors=available_professors.keys()
+        )
+        + [{"role": "user", "content": prompt}],
+        model=model,
+        temperature=0.5,
+        max_tokens=128,
+        response_format={"type": "json_object"},
+    )
+    response_text = response.choices[0].message.content
+    if not response_text:
+        raise TypeError("AI did not return a response.")
+
+    # Check that proper keys exist on response object
+    parsed = json.loads(response_text)
+    if "professors" not in parsed:
+        raise TypeError("Missing professors key in response.")
+    professors = parsed["professors"]
+    if not isinstance(professors, list):
+        raise TypeError("professors key is not a list.")
+
+    # Ensure that all listed professors are valid
+    professor_ids: list[str] = []
+    for professor in professors:
+        try:
+            professor_ids.append(available_professors[professor])
+        except KeyError:
+            raise ValueError("AI returned an invalid professor.")
+
+    return professor_ids
+
+
+class MultiProfContext(TypedDict):
+    info: ProfessorInfo
+    course: str
+    course_display: str
+
+
+def create_multi_prof_feedback_prompt(
+    *,
+    info: Iterable[MultiProfContext],
+) -> list[ChatCompletionMessageParam]:
+    professor_data = "\n".join(
+        map(
+            lambda xml: f"<professor>\n{xml}\n</professor>",
+            map(
+                lambda data: prof_info_to_xml(
+                    info=data["info"],
+                    course=data["course"],
+                    course_display=data["course_display"],
+                ),
+                info,
+            ),
+        )
+    )
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are an assistant designed to help users get information on their professors at the University of Ottawa. "
+                "The following is a collection of information about various professors. "
+                "Answer any questions that a user may have about these professors.\n\n"
+                "If a user asks where the data came from, or for any professor's page, you should provide the full `siteUrl` key for any relevant professors. "
+                "If a user asks for the source of multiple professors, format the response as a table."
+            ),
+        },
+        {
+            "role": "system",
+            "content": f"<professorList>{professor_data}</professorList>",
         },
     ]
 
@@ -86,7 +214,7 @@ async def generate_stream(
         model=model,
         temperature=0.5,
         stream=True,
-        max_tokens=1000,
+        max_tokens=1024,
     )
     async for chunk in stream:
         content = chunk.choices[0].delta.content
