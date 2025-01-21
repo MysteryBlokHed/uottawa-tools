@@ -66,7 +66,8 @@ def create_prof_feedback_prompt(
                 "You are an assistant designed to help users get information on their professors at the University of Ottawa. "
                 "The following is information on a particular professor. "
                 "Answer any questions that a user may have about this professor.\n\n"
-                "If a user asks where the data came from, or for this professor's page, you should provide the full `siteUrl` key."
+                "If a user asks where the data came from, or for this professor's page, you should provide the full `siteUrl` key. "
+                "You are NOT to provide this URL unless EXPLICITLY ASKED."
             ),
         },
         {
@@ -193,7 +194,7 @@ def create_multi_prof_feedback_prompt(
                 "The following is a collection of information about various professors. "
                 "Answer any questions that a user may have about these professors.\n\n"
                 "If a user asks where the data came from, or for any professor's page, you should provide the full `siteUrl` key for any relevant professors. "
-                "If a user asks for the source of multiple professors, format the response as a table."
+                "You are NOT to provide these URL unless EXPLICITLY ASKED."
             ),
         },
         {
