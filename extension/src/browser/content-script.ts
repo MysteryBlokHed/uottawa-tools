@@ -142,7 +142,8 @@ async function main() {
     ] satisfies Array<keyof Options>)) as Options;
 
     if (page.page !== CurrentPage.Unknown) unknownObserver.disconnect();
-    else if (page.page === CurrentPage.Unknown) unknownObserver.observe(document.body, { attributes: true, childList: true });
+    else if (page.page === CurrentPage.Unknown)
+        unknownObserver.observe(document.body, { attributes: true, childList: true });
 
     switch (page.page) {
         case CurrentPage.ClassSchedule:
@@ -256,7 +257,7 @@ async function main() {
                                                     // Reset response area
                                                     responseArea.innerText = responseRaw;
                                                     // Clear user input
-                                                    input.value = '';
+                                                    input.value = "";
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamChunk:
                                                     responseRaw += message.delta;
@@ -266,11 +267,14 @@ async function main() {
                                                         await marked(responseRaw),
                                                     );
                                                     // Make sure that any link tags open in a new tab
-                                                    for (const anchor of responseArea.getElementsByTagName('a')) anchor.target = '_blank';
+                                                    for (const anchor of responseArea.getElementsByTagName(
+                                                        "a",
+                                                    ))
+                                                        anchor.target = "_blank";
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamEnd:
                                                     aiButton.disabled = false;
-                                                    responseRaw = '';
+                                                    responseRaw = "";
                                                     break;
                                                 case IncomingExtensionEventType.ProfessorAiStreamFail:
                                                     console.error(
@@ -289,7 +293,13 @@ async function main() {
                                             createAiDialog(listener);
 
                                         // Disable button if input is empty
-                                        input.addEventListener('keypress', ev => aiButton.disabled = ((ev.target as HTMLInputElement).value.trim().length === 0));
+                                        input.addEventListener(
+                                            "keypress",
+                                            ev =>
+                                                (aiButton.disabled =
+                                                    (ev.target as HTMLInputElement).value.trim()
+                                                        .length === 0),
+                                        );
 
                                         sendButton.addEventListener("click", async () => {
                                             if (input.value.trim().length === 0) return;
