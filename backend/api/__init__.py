@@ -105,21 +105,27 @@ async def stream_multi_prof_feedback(
             )
 
         # Create ID->name mapping
-        ids_to_names: dict[str, str] = {}
+        names_to_ids: dict[str, str] = {}
         for provided_info, returned_info in zip(professors, prof_data):
             name = f"{returned_info['firstName']} {returned_info['lastName']}"
-            ids_to_names[name] = provided_info.id
+            names_to_ids[name] = provided_info.id
 
         # Determine which professors we need information on
         try:
             identified = await identify_referenced_profs(
                 client=openai,
                 model=AI_MODEL,
-                available_professors=ids_to_names,
+                available_professors=names_to_ids,
                 prompt=prompt,
             )
         except Exception as e:
             raise HTTPException(status_code=503, detail=str(e))
+
+        ids_to_names = {v: k for k, v in names_to_ids.items()}
+        print(
+            "Determined that request is about:",
+            ", ".join(map(lambda id: ids_to_names[id], identified)),
+        )
 
         # Get more detailed information for relevant professors
         detailed_info = await get_multi_info(client=session, ids=identified)
