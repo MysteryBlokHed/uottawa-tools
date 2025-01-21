@@ -67,7 +67,7 @@ def create_info_graphql_query(
     *,
     id: str,
     course: str | None,
-    ratings: int = 40,
+    ratings: int = 25,
 ):
     course_filter = (
         f", courseFilter: {json.dumps(course)}" if course is not None else ""
@@ -156,7 +156,7 @@ async def get_multi_info(
             "Content-Type": "application/json",
         },
         json={
-            "query": create_multi_info_graphql_query(ids=ids, ratings=40 // len(ids))
+            "query": create_multi_info_graphql_query(ids=ids, ratings=25 // len(ids))
         },
     )
     response: dict[Any, Any] = await r.json()
