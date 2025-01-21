@@ -11,46 +11,34 @@ from typing import Literal, TypedDict
 from .rmp import ProfessorRating, ProfessorInfo
 
 
-def format_feedback_for_prompt(feedback: dict[Literal["node"], ProfessorRating]) -> str:
-    node = feedback["node"]
-    return f"""<userFeedback>
-<clarityRating>{node['clarityRating']}/5.0</clarityRating>
-<difficultyRating>{node['difficultyRating']}/5.0</difficultyRating>
-<helpfulRating>{node['helpfulRating']}/5.0</helpfulRating>
-<comment>{node['comment']}</comment>
-</userFeedback>"""
-
-
-def prof_info_to_xml(
+def prof_info_to_json(
     *,
     info: ProfessorInfo,
     course: str,
     course_display: str,
-) -> str:
+):
     numerical_id = base64.b64decode(info["id"]).decode()[8:]
     source_url = f"https://www.ratemyprofessors.com/professor/{numerical_id}"
 
-    prompt_comments = "\n".join(
-        map(format_feedback_for_prompt, info["ratings"]["edges"])
-    )
+    prompt_comments = map(lambda edge: edge["node"], info["ratings"]["edges"])
 
-    return f"""<dataSourceSection>
-<siteName>Rate My Professors</siteName>
-<siteUrl>{source_url}</siteUrl>
-</dataSourceSection>
-<professorDetailsSection>
-<professorName>{info['firstName']} {info['lastName']}</professorName>
-<avgRating>{info['avgRating']}</avgRating>
-<avgDifficulty>{info['avgDifficulty']}</avgDifficulty>
-<wouldTakeAgainPercent>{info['wouldTakeAgainPercent']:.2f}<wouldTakeAgainPercent>
-</professorDetailsSection>
-<courseDetailsSection>
-<courseCode>{course}</courseCode>
-<courseDisplayName>{course_display}</courseDisplayName>
-</courseDetailsSection>
-<userFeedbackSection>
-{prompt_comments}
-</userFeedbackSection>"""
+    return {
+        "source": {
+            "site_name": "Rate My Professors",
+            "site_url": source_url,
+        },
+        "professor": {
+            "name": info["firstName"] + " " + info["lastName"],
+            "avg_rating": info["avgRating"],
+            "avg_difficulty": info["avgDifficulty"],
+            "would_take_again": f"{info['wouldTakeAgainPercent']:.2f}%",
+        },
+        "course": {
+            "code": course,
+            "display_name": course_display,
+        },
+        "user_feedback": list(prompt_comments),
+    }
 
 
 def create_prof_feedback_prompt(
@@ -72,10 +60,13 @@ def create_prof_feedback_prompt(
         },
         {
             "role": "system",
-            "content": prof_info_to_xml(
-                info=info,
-                course=course,
-                course_display=course_display,
+            "content": json.dumps(
+                prof_info_to_json(
+                    info=info,
+                    course=course,
+                    course_display=course_display,
+                ),
+                indent=0,
             ),
         },
     ]
@@ -85,9 +76,7 @@ def create_multi_prof_identification_prompt(
     *,
     available_professors: Iterable[str],
 ) -> list[ChatCompletionMessageParam]:
-    names = "\n".join(
-        map(lambda name: f"<professorName>{name}</professorName>", available_professors)
-    )
+    names = {"professors": list(available_professors)}
     return [
         {
             "role": "system",
@@ -104,7 +93,7 @@ def create_multi_prof_identification_prompt(
         },
         {
             "role": "system",
-            "content": f"<professorList>\n{names}\n</professorList>",
+            "content": json.dumps(names, indent=0),
         },
     ]
 
@@ -173,11 +162,10 @@ def create_multi_prof_feedback_prompt(
     *,
     info: Iterable[MultiProfContext],
 ) -> list[ChatCompletionMessageParam]:
-    professor_data = "\n".join(
-        map(
-            lambda xml: f"<professor>\n{xml}\n</professor>",
+    professor_list = {
+        "professors": list(
             map(
-                lambda data: prof_info_to_xml(
+                lambda data: prof_info_to_json(
                     info=data["info"],
                     course=data["course"],
                     course_display=data["course_display"],
@@ -185,7 +173,8 @@ def create_multi_prof_feedback_prompt(
                 info,
             ),
         )
-    )
+    }
+
     return [
         {
             "role": "system",
@@ -199,7 +188,7 @@ def create_multi_prof_feedback_prompt(
         },
         {
             "role": "system",
-            "content": f"<professorList>{professor_data}</professorList>",
+            "content": json.dumps(professor_list, indent=0),
         },
     ]
 
