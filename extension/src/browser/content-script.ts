@@ -80,7 +80,13 @@ async function addRmp(
  * Create the dialog used to communicate with the AI.
  * @param chromeListener The event listener for streamed responses. Used to kill the listener once the dialog is closed
  */
-function createAiDialog(chromeListener: MessageListener) {
+function createAiDialog(): [
+    HTMLDialogElement,
+    HTMLButtonElement,
+    HTMLParagraphElement,
+    HTMLInputElement,
+    (chromeListener: MessageListener) => void,
+] {
     const dialog = document.createElement("dialog");
     dialog.style.textAlign = "center";
     dialog.style.width = "400px";
@@ -88,14 +94,6 @@ function createAiDialog(chromeListener: MessageListener) {
     dialog.style.display = "flex";
     dialog.style.flexDirection = "column";
     dialog.style.justifyContent = "space-between";
-    dialog.addEventListener(
-        "close",
-        () => {
-            dialog.remove();
-            chrome.runtime.onMessage.removeListener(chromeListener);
-        },
-        { once: true },
-    );
 
     const title = document.createElement("h1");
     title.innerText = "Ask AI";
@@ -127,10 +125,64 @@ function createAiDialog(chromeListener: MessageListener) {
 
     document.body.appendChild(dialog);
 
-    return [dialog, submitButton, response, promptInput] as const;
+    return [
+        dialog,
+        submitButton,
+        response,
+        promptInput,
+        chromeListener => {
+            dialog.addEventListener(
+                "close",
+                () => {
+                    dialog.remove();
+                    chrome.runtime.onMessage.removeListener(chromeListener);
+                },
+                { once: true },
+            );
+        },
+    ];
 }
 
 const unknownObserver = new MutationObserver(main);
+
+function createAiStreamListener(
+    responseArea: HTMLElement,
+    input: HTMLInputElement,
+    aiButton: HTMLButtonElement,
+) {
+    let responseRaw = "";
+    // Set up listener for stream response
+    const listener = (async (message: IncomingExtensionEvent) => {
+        switch (message.event) {
+            case IncomingExtensionEventType.ProfessorAiStreamStart:
+                // Reset response area
+                responseArea.innerText = responseRaw;
+                // Clear user input
+                input.value = "";
+                break;
+            case IncomingExtensionEventType.ProfessorAiStreamChunk:
+                responseRaw += message.delta;
+                // It seems quite inefficient to re-process the whole stream for every chunk, but it doesn't cause
+                // any noticeable lag so seems fine
+                responseArea.innerHTML = DOMPurify.sanitize(await marked(responseRaw));
+                // Make sure that any link tags open in a new tab
+                for (const anchor of responseArea.getElementsByTagName("a"))
+                    anchor.target = "_blank";
+                break;
+            case IncomingExtensionEventType.ProfessorAiStreamEnd:
+                aiButton.disabled = false;
+                responseRaw = "";
+                break;
+            case IncomingExtensionEventType.ProfessorAiStreamFail:
+                console.error("Error getting AI completion:", message.reason);
+                responseArea.innerHTML =
+                    '<span style="color: red;">Failed to get AI response</span>';
+                aiButton.disabled = false;
+                break;
+        }
+    }) satisfies MessageListener;
+    return listener;
+}
 
 async function main() {
     const page = identifyPage();
@@ -176,13 +228,20 @@ async function main() {
                 if (options.calendarExport) {
                     const row =
                         document.querySelector<HTMLTableRowElement>("tr[id*=trCLASS_MTG_VW]");
-                    const btnContainer =
+                    const parentDiv =
                         // @ts-expect-error Trust these elements exist
                         row.parentElement.parentElement.parentElement.parentElement.parentElement
                             .parentElement.parentElement.parentElement.parentElement.parentElement
                             .parentElement.parentElement.parentElement.parentElement.parentElement
                             .parentElement.parentElement.parentElement.parentElement.parentElement
                             .parentElement;
+                    const btnContainer = document.createElement("div");
+                    parentDiv!.prepend(btnContainer);
+
+                    const calendarHeading = document.createElement("h2");
+                    calendarHeading.style.margin = "0";
+                    calendarHeading.innerText = "Calendar";
+                    btnContainer.appendChild(calendarHeading);
 
                     const icsButton = document.createElement("button");
                     icsButton.type = "button";
@@ -210,8 +269,8 @@ async function main() {
                         });
                     };
 
-                    btnContainer!.prepend(googleCalButton);
-                    btnContainer!.prepend(icsButton);
+                    btnContainer.append(icsButton);
+                    btnContainer.append(googleCalButton);
                 }
 
                 // ===============
@@ -226,6 +285,11 @@ async function main() {
                         // RMP AI Chat
                         // ===========
                         if (options.rmpAiFeedback) {
+                            // For the multi-professor API
+                            const multiProfessorInfo: Array<
+                                Record<"id" | "course" | "course_display", string>
+                            > = [];
+
                             const ids = rmpResponse[1];
                             for (const row of rows.values()) {
                                 const name = (
@@ -242,64 +306,34 @@ async function main() {
                                             // @ts-expect-error Trust these elements exist
                                             .parentElement.parentElement.children[0].innerText;
                                     const [courseCode, courseName] = classParent.split(" - ");
+                                    // For the multi-professor API
+                                    multiProfessorInfo.push({
+                                        id: ids[name],
+                                        course: courseCode,
+                                        course_display: courseName,
+                                    });
+
+                                    // Professor-scoped AI chat
                                     const aiButton = document.createElement("button");
                                     aiButton.type = "button";
                                     aiButton.style.width = "100%";
                                     aiButton.innerText = "Ask AI";
                                     aiButton.onclick = async () => {
-                                        let responseRaw = "";
-                                        // Set up listener for stream response
-                                        const listener = (async (
-                                            message: IncomingExtensionEvent,
-                                        ) => {
-                                            switch (message.event) {
-                                                case IncomingExtensionEventType.ProfessorAiStreamStart:
-                                                    // Reset response area
-                                                    responseArea.innerText = responseRaw;
-                                                    // Clear user input
-                                                    input.value = "";
-                                                    break;
-                                                case IncomingExtensionEventType.ProfessorAiStreamChunk:
-                                                    responseRaw += message.delta;
-                                                    // It seems quite inefficient to re-process the whole stream for every chunk, but it doesn't cause
-                                                    // any noticeable lag so seems fine
-                                                    responseArea.innerHTML = DOMPurify.sanitize(
-                                                        await marked(responseRaw),
-                                                    );
-                                                    // Make sure that any link tags open in a new tab
-                                                    for (const anchor of responseArea.getElementsByTagName(
-                                                        "a",
-                                                    ))
-                                                        anchor.target = "_blank";
-                                                    break;
-                                                case IncomingExtensionEventType.ProfessorAiStreamEnd:
-                                                    aiButton.disabled = false;
-                                                    responseRaw = "";
-                                                    break;
-                                                case IncomingExtensionEventType.ProfessorAiStreamFail:
-                                                    console.error(
-                                                        "Error getting AI completion:",
-                                                        message.reason,
-                                                    );
-                                                    responseArea.innerHTML =
-                                                        '<span style="color: red;">Failed to get AI response</span>';
-                                                    aiButton.disabled = false;
-                                                    break;
-                                            }
-                                        }) satisfies MessageListener;
-                                        chrome.runtime.onMessage.addListener(listener);
+                                        const [
+                                            dialog,
+                                            sendButton,
+                                            responseArea,
+                                            input,
+                                            registerListener,
+                                        ] = createAiDialog();
 
-                                        const [dialog, sendButton, responseArea, input] =
-                                            createAiDialog(listener);
-
-                                        // Disable button if input is empty
-                                        input.addEventListener(
-                                            "keypress",
-                                            ev =>
-                                                (aiButton.disabled =
-                                                    (ev.target as HTMLInputElement).value.trim()
-                                                        .length === 0),
+                                        const listener = createAiStreamListener(
+                                            responseArea,
+                                            input,
+                                            aiButton,
                                         );
+                                        chrome.runtime.onMessage.addListener(listener);
+                                        registerListener(listener);
 
                                         sendButton.addEventListener("click", async () => {
                                             if (input.value.trim().length === 0) return;
@@ -330,6 +364,73 @@ async function main() {
                                     row.children[5].appendChild(aiButton);
                                 }
                             }
+
+                            // Create multi professor chat button
+                            const row =
+                                document.querySelector<HTMLTableRowElement>(
+                                    "tr[id*=trCLASS_MTG_VW]",
+                                );
+                            const parentDiv =
+                                // @ts-expect-error Trust these elements exist
+                                row.parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement;
+
+                            const multiAiContainer = document.createElement("div");
+                            parentDiv!.prepend(multiAiContainer);
+
+                            const multiAiHeading = document.createElement("h2");
+                            multiAiHeading.style.margin = "0";
+                            multiAiHeading.innerText = "Multi-Professor AI";
+                            multiAiContainer.appendChild(multiAiHeading);
+
+                            const multiAiButton = document.createElement("button");
+                            multiAiButton.type = "button";
+                            multiAiButton.style.width = "100%";
+                            multiAiButton.innerText = "Ask AI";
+                            multiAiContainer.appendChild(multiAiButton);
+
+                            multiAiButton.onclick = async () => {
+                                const [dialog, sendButton, responseArea, input, registerListener] =
+                                    createAiDialog();
+
+                                const listener = createAiStreamListener(
+                                    responseArea,
+                                    input,
+                                    multiAiButton,
+                                );
+                                chrome.runtime.onMessage.addListener(listener);
+                                registerListener(listener);
+
+                                sendButton.addEventListener("click", async () => {
+                                    if (input.value.trim().length === 0) return;
+                                    responseArea.innerHTML =
+                                        '<span style="color: gray;">Waiting for response...</span>';
+
+                                    console.log("Going to send request with", multiProfessorInfo);
+
+                                    const response =
+                                        await chrome.runtime.sendMessage<ExtensionEvent>({
+                                            event: ExtensionEventType.MultiProfessorAiCompletion,
+                                            professors: multiProfessorInfo,
+                                            prompt: input.value.trim(),
+                                        });
+
+                                    if (!response.success) {
+                                        console.error(
+                                            "Unsuccessful response from service worker",
+                                            response,
+                                        );
+                                        responseArea.innerHTML =
+                                            '<span style="color: red;">Failed to communicate with backend</span>';
+                                        return;
+                                    }
+                                });
+                                dialog.showModal();
+                            };
                         }
                     }
                 }
