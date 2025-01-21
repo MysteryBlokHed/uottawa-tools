@@ -87,6 +87,7 @@ def create_multi_prof_identification_prompt(
                 "If a user requests information on all professors, return all professors' names. "
                 "If a user requests a professor that is not listed, simply ignore that request.\n\n"
                 "Your response should be a list of strings in a JSON key called `professors`. "
+                "If you do not have enough information to determine the relevant professors, return no names.\n\n"
                 "NAMES MUST BE EXACT!! If a user specifies only part of a professor's name, insert the FULL NAME of the closest professor. "
                 "If there are multiple professors with a similar name, include ALL OF THEM."
             ),

@@ -1,5 +1,7 @@
 """Wrappers around Rate My Professors APIs."""
 
+from __future__ import annotations
+
 from collections.abc import Iterable
 import aiohttp
 
@@ -7,11 +9,13 @@ import base64
 import json
 from typing import Any, Literal, TypedDict
 
-from aiohttp.abc import IterableBase
 
 ENDPOINT = "https://www.ratemyprofessors.com/graphql"
 AUTH = f"Basic {base64.b64encode('test:test'.encode('utf-8')).decode()}"
 SCHOOL_ID = base64.b64encode("School-1452".encode("utf-8")).decode()
+
+cache: dict[str, ProfessorInfo] = {}
+"""To avoid superfluous requests to the RMP endpoint."""
 
 
 class ProfessorRating(TypedDict):
@@ -81,6 +85,10 @@ async def get_professor_info(
     id: str,
     course: str,
 ) -> ProfessorInfo | None:
+    if id in cache:
+        return cache[id]
+
+    print("Note: No cache for ID", id)
     r = await client.post(
         ENDPOINT,
         headers={
@@ -111,7 +119,9 @@ async def get_professor_info(
         if "errors" in response:
             return None
 
-    return response["data"]["node"]
+    # Cache professor info for future requests
+    cache[id] = response["data"]["node"]
+    return cache[id]
 
 
 async def get_multi_basic_info(
@@ -147,22 +157,35 @@ async def get_multi_info(
     if len(ids) == 0:
         return None
 
-    r = await client.post(
-        ENDPOINT,
-        headers={
-            "Accept": "*/*",
-            "Authorization": AUTH,
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "application/json",
-        },
-        json={
-            "query": create_multi_info_graphql_query(ids=ids, ratings=25 // len(ids))
-        },
-    )
-    response: dict[Any, Any] = await r.json()
-    if "errors" in response:
-        return None
+    uncached_ids = list(filter(lambda id: id not in cache, ids))
+    if uncached_ids:
+        print("Note: No cache for IDs", ", ".join(uncached_ids))
 
-    data = list(map(lambda pair: (int(pair[0][1:]), pair[1]), response["data"].items()))
-    data.sort()
-    return map(lambda pair: pair[1], data)
+        r = await client.post(
+            ENDPOINT,
+            headers={
+                "Accept": "*/*",
+                "Authorization": AUTH,
+                "Access-Control-Allow-Origin": "*",
+                "Content-Type": "application/json",
+            },
+            json={
+                "query": create_multi_info_graphql_query(ids=uncached_ids, ratings=25)
+            },
+        )
+        response: dict[Any, Any] = await r.json()
+        if "errors" in response:
+            return None
+
+        data = list(
+            map(lambda pair: (int(pair[0][1:]), pair[1]), response["data"].items())
+        )
+        data.sort()
+        data_mapped: list[ProfessorInfo] = list(map(lambda pair: pair[1], data))
+
+        # Cache professor info for future requests
+        for id, info in zip(uncached_ids, data_mapped):
+            cache[id] = info
+
+    # Return requested data
+    return map(lambda id: cache[id], ids)

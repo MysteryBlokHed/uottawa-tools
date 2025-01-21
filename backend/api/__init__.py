@@ -18,7 +18,8 @@ app = FastAPI()
 
 AI_MODEL = os.environ["OPENAI_MODEL"]
 openai = AsyncOpenAI(
-    base_url=os.environ.get("OPENAI_ENDPOINT"), api_key=os.environ["OPENAI_KEY"]
+    base_url=os.environ.get("OPENAI_ENDPOINT"),
+    api_key=os.environ["OPENAI_KEY"],
 )
 
 
@@ -134,6 +135,12 @@ async def stream_multi_prof_feedback(
                 status_code=404,
                 detail="Failed to get info for identified professors.",
             )
+        detailed_info = list(detailed_info)
+
+        # Cap the max number of comments per professor to avoid token limits
+        max_ratings = 25 // len(identified)
+        for info in detailed_info:
+            info["ratings"]["edges"] = info["ratings"]["edges"][:max_ratings]
 
     identified_prof_ids = filter(lambda prof: prof.id in identified, professors)
     multi_prof_context: map[MultiProfContext] = map(
