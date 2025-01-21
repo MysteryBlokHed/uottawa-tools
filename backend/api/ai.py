@@ -149,7 +149,8 @@ async def identify_referenced_profs(
         except KeyError:
             raise ValueError("AI returned an invalid professor.")
 
-    return professor_ids
+    # If no professor ids were returned by the model, use all professors
+    return professor_ids or list(available_professors.values())
 
 
 class MultiProfContext(TypedDict):
