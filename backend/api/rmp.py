@@ -67,7 +67,7 @@ def create_info_graphql_query(
     *,
     id: str,
     course: str | None,
-    ratings: int = 25,
+    ratings: int = 40,
 ):
     course_filter = (
         f", courseFilter: {json.dumps(course)}" if course is not None else ""
@@ -144,6 +144,9 @@ async def get_multi_info(
     ids: Iterable[str],
 ) -> Iterable[ProfessorInfo] | None:
     ids = list(ids)
+    if len(ids) == 0:
+        return None
+
     r = await client.post(
         ENDPOINT,
         headers={
@@ -153,7 +156,7 @@ async def get_multi_info(
             "Content-Type": "application/json",
         },
         json={
-            "query": create_multi_info_graphql_query(ids=ids, ratings=25 // len(ids))
+            "query": create_multi_info_graphql_query(ids=ids, ratings=40 // len(ids))
         },
     )
     response: dict[Any, Any] = await r.json()
