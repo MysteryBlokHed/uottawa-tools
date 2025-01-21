@@ -15,6 +15,42 @@ import {
 
 const AI_ENDPOINT = "http://127.0.0.1:8000";
 
+async function streamToClient(reader: ReadableStreamDefaultReader<Uint8Array>, tabId: number) {
+    try {
+        const decoder = new TextDecoder();
+        let sentStartSignal = false;
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                    event: IncomingExtensionEventType.ProfessorAiStreamEnd,
+                });
+                break;
+            }
+
+            // Wait until the first chunk is actually received before telling the frontend to clear the response field
+            if (!sentStartSignal) {
+                sentStartSignal = true;
+                chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                    event: IncomingExtensionEventType.ProfessorAiStreamStart,
+                });
+            }
+
+            chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+                event: IncomingExtensionEventType.ProfessorAiStreamChunk,
+                delta: decoder.decode(value),
+            });
+        }
+    } catch (e) {
+        console.error("Failed to get AI completion", e);
+        chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
+            event: IncomingExtensionEventType.ProfessorAiStreamFail,
+            reason: e,
+        });
+        return;
+    }
+}
+
 chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendResponse) => {
     (async () => {
         console.log("Got message:", message);
@@ -159,39 +195,46 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                 sendResponse({ success: true });
 
                 // Stream response back to client
-                try {
-                    const decoder = new TextDecoder();
-                    let sentStartSignal = false;
-                    while (true) {
-                        const { value, done } = await reader.read();
-                        if (done) {
-                            chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
-                                event: IncomingExtensionEventType.ProfessorAiStreamEnd,
-                            });
-                            break;
-                        }
-
-                        // Wait until the first chunk is actually received before telling the frontend to clear the response field
-                        if (!sentStartSignal) {
-                            sentStartSignal = true;
-                            chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
-                                event: IncomingExtensionEventType.ProfessorAiStreamStart,
-                            });
-                        }
-
-                        chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
-                            event: IncomingExtensionEventType.ProfessorAiStreamChunk,
-                            delta: decoder.decode(value),
-                        });
+                await streamToClient(reader, tabId);
+                break;
+            }
+            case ExtensionEventType.MultiProfessorAiCompletion: {
+                console.log("Getting AI completion for multi professor info");
+                // Remove repeat professor IDs
+                const indicesToRemove: number[] = [];
+                for (let i = 0; i < message.professors.length - 1; ++i) {
+                    if (indicesToRemove.includes(i)) continue;
+                    for (let j = i + 1; j < message.professors.length; ++j) {
+                        if (message.professors[i].id === message.professors[j].id)
+                            indicesToRemove.push(j);
                     }
-                } catch (e) {
-                    console.error("Failed to get AI completion", e);
-                    chrome.tabs.sendMessage<IncomingExtensionEvent>(tabId, {
-                        event: IncomingExtensionEventType.ProfessorAiStreamFail,
-                        reason: e,
-                    });
+                }
+                indicesToRemove.reverse();
+                for (const index of indicesToRemove) message.professors.splice(index, 1);
+
+                const response = await fetch(
+                    `${AI_ENDPOINT}/stream_multi_prof_feedback/${encodeURIComponent(message.prompt)}`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Access-Control-Allow-Origin": "*",
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(message.professors),
+                    },
+                );
+                if (response.status !== 200 || !response.body)
+                    throw new TypeError("Non-200 response from API");
+                const reader = response.body.getReader();
+                const tabId = sender.tab?.id;
+                if (tabId == null) {
+                    sendResponse({ success: false });
                     return;
                 }
+                sendResponse({ success: true });
+
+                // Stream response back to client
+                await streamToClient(reader, tabId);
                 break;
             }
             default:

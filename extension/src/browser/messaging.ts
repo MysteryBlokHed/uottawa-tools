@@ -6,6 +6,7 @@ export const enum ExtensionEventType {
     RmpBasicMulti,
     WeeklyCalendar,
     ProfessorAiCompletion,
+    MultiProfessorAiCompletion,
 }
 
 export interface GoogleCalendarList {
@@ -30,11 +31,24 @@ export interface ProfessorAiCompletion {
     prompt: string;
 }
 
+export interface MultiProfessorContext {
+    id: string;
+    course: string;
+    course_display: string;
+}
+
+export interface MultiProfessorAiCompletion {
+    event: ExtensionEventType.MultiProfessorAiCompletion;
+    professors: MultiProfessorContext[];
+    prompt: string;
+}
+
 export type ExtensionEvent =
     | GoogleCalendarList
     | GooglePush
     | RmpBasicMulti
-    | ProfessorAiCompletion;
+    | ProfessorAiCompletion
+    | MultiProfessorAiCompletion;
 
 export const enum IncomingExtensionEventType {
     ProfessorAiStreamStart,
