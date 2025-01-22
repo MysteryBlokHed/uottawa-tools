@@ -17,10 +17,7 @@ _ = load_dotenv()
 app = FastAPI()
 
 AI_MODEL = os.environ["OPENAI_MODEL"]
-openai = AsyncOpenAI(
-    base_url=os.environ.get("OPENAI_ENDPOINT"),
-    api_key=os.environ["OPENAI_KEY"],
-)
+openai = AsyncOpenAI()
 
 
 @app.get("/", description="Basic endpoint to verify that the API is running.")
@@ -29,7 +26,7 @@ def status() -> dict[Literal["status"], str]:
 
 
 @app.get(
-    "/stream_prof_feedback/{id}/{course}/{course_display}/{prompt}",
+    "/prof_feedback/{id}",
     description=(
         "Uses AI to get information about a professor based on Rate My Professors comments. "
         "Response are streamed instead of being returned all at once."
@@ -72,7 +69,7 @@ class MultiProfessorInfo(BaseModel):
 
 
 @app.post(
-    "/stream_multi_prof_feedback/{prompt}",
+    "/multi_prof_feedback",
     description=(
         "Uses AI to get information about multiple professors based on Rate My Professors comments. "
         "Response are streamed instead of being returned all at once."

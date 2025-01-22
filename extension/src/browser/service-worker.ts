@@ -180,8 +180,13 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                 break;
             case ExtensionEventType.ProfessorAiCompletion: {
                 console.log("Getting AI completion for professor info");
+                const params = new URLSearchParams({
+                    course: message.courseCode,
+                    course_display: message.courseName,
+                    prompt: message.prompt,
+                });
                 const response = await fetch(
-                    `${AI_ENDPOINT}/stream_prof_feedback/${encodeURIComponent(message.professorId)}/${encodeURIComponent(message.courseCode)}/${encodeURIComponent(message.courseName)}/${encodeURIComponent(message.prompt)}`,
+                    `${AI_ENDPOINT}/prof_feedback/${message.professorId}?${params.toString()}`,
                     { headers: { "Access-Control-Allow-Origin": "*" } },
                 );
                 if (response.status !== 200 || !response.body)
@@ -213,7 +218,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                 for (const index of indicesToRemove) message.professors.splice(index, 1);
 
                 const response = await fetch(
-                    `${AI_ENDPOINT}/stream_multi_prof_feedback/${encodeURIComponent(message.prompt)}`,
+                    `${AI_ENDPOINT}/multi_prof_feedback?prompt=${encodeURIComponent(message.prompt)}`,
                     {
                         method: "POST",
                         headers: {

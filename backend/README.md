@@ -9,9 +9,9 @@ The project expects the following env variables:
 
 ```sh
 # Optional, defaults to OpenAI
-OPENAI_ENDPOINT=https://api.openai.com/v1
+OPENAI_BASE_URL=https://api.openai.com/v1
 # Auth token for chosen endpoint
-OPENAI_KEY=abcd
+OPENAI_API_KEY=abcd
 # LLM to use
 OPENAI_MODEL=gpt-4o-mini
 ```
