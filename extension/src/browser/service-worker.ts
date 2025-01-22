@@ -189,8 +189,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                     `${AI_ENDPOINT}/prof_feedback/${message.professorId}?${params.toString()}`,
                     { headers: { "Access-Control-Allow-Origin": "*" } },
                 );
-                if (response.status !== 200 || !response.body)
+                if (response.status !== 200 || !response.body) {
+                    sendResponse({ success: false });
                     throw new TypeError("Non-200 response from API");
+                }
                 const reader = response.body.getReader();
                 const tabId = sender.tab?.id;
                 if (tabId == null) {
@@ -228,8 +230,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionEvent, sender, sendRespo
                         body: JSON.stringify(message.professors),
                     },
                 );
-                if (response.status !== 200 || !response.body)
+                if (response.status !== 200 || !response.body) {
+                    sendResponse({ success: false });
                     throw new TypeError("Non-200 response from API");
+                }
                 const reader = response.body.getReader();
                 const tabId = sender.tab?.id;
                 if (tabId == null) {
