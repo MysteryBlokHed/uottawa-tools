@@ -6,6 +6,7 @@ import {
     IncomingExtensionEventType,
     type ExtensionEvent,
     type IncomingExtensionEvent,
+    type MultiProfessorContext,
 } from "./messaging.js";
 import { CurrentPage, identifyPage } from "./page-info.js";
 import { classToEvents } from "../utils/export-classes.js";
@@ -141,6 +142,89 @@ function createAiDialog(): [
             );
         },
     ];
+}
+
+function createAiButton(profId: string, courseCode: string, courseName: string): HTMLButtonElement {
+    const aiButton = document.createElement("button");
+    aiButton.type = "button";
+    aiButton.style.width = "100%";
+    aiButton.innerText = "Ask AI";
+    aiButton.onclick = async () => {
+        const [dialog, sendButton, responseArea, input, registerListener] = createAiDialog();
+
+        const listener = createAiStreamListener(responseArea, input, aiButton);
+        chrome.runtime.onMessage.addListener(listener);
+        registerListener(listener);
+
+        sendButton.addEventListener("click", async () => {
+            if (input.value.trim().length === 0) return;
+            responseArea.innerHTML = '<span style="color: gray;">Waiting for response...</span>';
+
+            const response = await chrome.runtime.sendMessage<ExtensionEvent>({
+                event: ExtensionEventType.ProfessorAiCompletion,
+                courseCode: courseCode.replaceAll(" ", ""),
+                courseName,
+                professorId: profId,
+                prompt: input.value.trim(),
+            });
+
+            if (!response.success) {
+                console.error("Unsuccessful response from service worker", response);
+                responseArea.innerHTML =
+                    '<span style="color: red;">Failed to communicate with backend</span>';
+                return;
+            }
+        });
+        dialog.showModal();
+    };
+
+    return aiButton;
+}
+
+function createMultiAiSection(multiProfessorInfo: MultiProfessorContext[]): HTMLDivElement {
+    const multiAiContainer = document.createElement("div");
+
+    const multiAiHeading = document.createElement("h2");
+    multiAiHeading.style.margin = "0";
+    multiAiHeading.innerText = "Multi-Professor AI";
+    multiAiContainer.appendChild(multiAiHeading);
+
+    const multiAiButton = document.createElement("button");
+    multiAiButton.type = "button";
+    multiAiButton.style.width = "100%";
+    multiAiButton.innerText = "Ask AI";
+    multiAiContainer.appendChild(multiAiButton);
+
+    multiAiButton.onclick = async () => {
+        const [dialog, sendButton, responseArea, input, registerListener] = createAiDialog();
+
+        const listener = createAiStreamListener(responseArea, input, multiAiButton);
+        chrome.runtime.onMessage.addListener(listener);
+        registerListener(listener);
+
+        sendButton.addEventListener("click", async () => {
+            if (input.value.trim().length === 0) return;
+            responseArea.innerHTML = '<span style="color: gray;">Waiting for response...</span>';
+
+            console.log("Going to send request with", multiProfessorInfo);
+
+            const response = await chrome.runtime.sendMessage<ExtensionEvent>({
+                event: ExtensionEventType.MultiProfessorAiCompletion,
+                professors: multiProfessorInfo,
+                prompt: input.value.trim(),
+            });
+
+            if (!response.success) {
+                console.error("Unsuccessful response from service worker", response);
+                responseArea.innerHTML =
+                    '<span style="color: red;">Failed to communicate with backend</span>';
+                return;
+            }
+        });
+        dialog.showModal();
+    };
+
+    return multiAiContainer;
 }
 
 const unknownObserver = new MutationObserver(main);
@@ -314,53 +398,11 @@ async function main() {
                                     });
 
                                     // Professor-scoped AI chat
-                                    const aiButton = document.createElement("button");
-                                    aiButton.type = "button";
-                                    aiButton.style.width = "100%";
-                                    aiButton.innerText = "Ask AI";
-                                    aiButton.onclick = async () => {
-                                        const [
-                                            dialog,
-                                            sendButton,
-                                            responseArea,
-                                            input,
-                                            registerListener,
-                                        ] = createAiDialog();
-
-                                        const listener = createAiStreamListener(
-                                            responseArea,
-                                            input,
-                                            aiButton,
-                                        );
-                                        chrome.runtime.onMessage.addListener(listener);
-                                        registerListener(listener);
-
-                                        sendButton.addEventListener("click", async () => {
-                                            if (input.value.trim().length === 0) return;
-                                            responseArea.innerHTML =
-                                                '<span style="color: gray;">Waiting for response...</span>';
-
-                                            const response =
-                                                await chrome.runtime.sendMessage<ExtensionEvent>({
-                                                    event: ExtensionEventType.ProfessorAiCompletion,
-                                                    courseCode: courseCode.replaceAll(" ", ""),
-                                                    courseName,
-                                                    professorId: ids[name],
-                                                    prompt: input.value.trim(),
-                                                });
-
-                                            if (!response.success) {
-                                                console.error(
-                                                    "Unsuccessful response from service worker",
-                                                    response,
-                                                );
-                                                responseArea.innerHTML =
-                                                    '<span style="color: red;">Failed to communicate with backend</span>';
-                                                return;
-                                            }
-                                        });
-                                        dialog.showModal();
-                                    };
+                                    const aiButton = createAiButton(
+                                        ids[name],
+                                        courseCode,
+                                        courseName,
+                                    );
                                     row.children[5].appendChild(aiButton);
                                 }
                             }
@@ -379,58 +421,8 @@ async function main() {
                                     .parentElement.parentElement.parentElement.parentElement
                                     .parentElement;
 
-                            const multiAiContainer = document.createElement("div");
+                            const multiAiContainer = createMultiAiSection(multiProfessorInfo);
                             parentDiv!.prepend(multiAiContainer);
-
-                            const multiAiHeading = document.createElement("h2");
-                            multiAiHeading.style.margin = "0";
-                            multiAiHeading.innerText = "Multi-Professor AI";
-                            multiAiContainer.appendChild(multiAiHeading);
-
-                            const multiAiButton = document.createElement("button");
-                            multiAiButton.type = "button";
-                            multiAiButton.style.width = "100%";
-                            multiAiButton.innerText = "Ask AI";
-                            multiAiContainer.appendChild(multiAiButton);
-
-                            multiAiButton.onclick = async () => {
-                                const [dialog, sendButton, responseArea, input, registerListener] =
-                                    createAiDialog();
-
-                                const listener = createAiStreamListener(
-                                    responseArea,
-                                    input,
-                                    multiAiButton,
-                                );
-                                chrome.runtime.onMessage.addListener(listener);
-                                registerListener(listener);
-
-                                sendButton.addEventListener("click", async () => {
-                                    if (input.value.trim().length === 0) return;
-                                    responseArea.innerHTML =
-                                        '<span style="color: gray;">Waiting for response...</span>';
-
-                                    console.log("Going to send request with", multiProfessorInfo);
-
-                                    const response =
-                                        await chrome.runtime.sendMessage<ExtensionEvent>({
-                                            event: ExtensionEventType.MultiProfessorAiCompletion,
-                                            professors: multiProfessorInfo,
-                                            prompt: input.value.trim(),
-                                        });
-
-                                    if (!response.success) {
-                                        console.error(
-                                            "Unsuccessful response from service worker",
-                                            response,
-                                        );
-                                        responseArea.innerHTML =
-                                            '<span style="color: red;">Failed to communicate with backend</span>';
-                                        return;
-                                    }
-                                });
-                                dialog.showModal();
-                            };
                         }
                     }
                 }
@@ -445,7 +437,77 @@ async function main() {
                     const rows = document.querySelectorAll<HTMLTableRowElement>(
                         "tr[id*=trSSR_CLSRCH_MTG1]",
                     );
-                    addRmp(() => rows.values(), 4, true);
+                    const rmpResponse = await addRmp(() => rows.values(), 4, true);
+                    if (rmpResponse != null) {
+                        // ===========
+                        // RMP AI Chat
+                        // ===========
+                        if (options.rmpAiFeedback) {
+                            // For the multi-professor API
+                            const multiProfessorInfo: Array<
+                                Record<"id" | "course" | "course_display", string>
+                            > = [];
+
+                            const ids = rmpResponse[1];
+                            for (const row of rows.values()) {
+                                const name = (row.children[4] as HTMLTableColElement).childNodes[0]
+                                    .textContent!;
+                                if (name && name in ids) {
+                                    const classParent: string =
+                                        // @ts-expect-error Trust these elements exist
+                                        row.parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .parentElement.parentElement.parentElement.parentElement
+                                            .firstChild.firstChild.firstChild.lastChild
+                                            .textContent!;
+                                    const [courseCode, courseName] = classParent
+                                        .trim()
+                                        .split(" - ");
+                                    // For the multi-professor API
+                                    multiProfessorInfo.push({
+                                        id: ids[name],
+                                        course: courseCode,
+                                        course_display: courseName,
+                                    });
+
+                                    // Professor-scoped AI chat
+                                    const aiButton = createAiButton(
+                                        ids[name],
+                                        courseCode,
+                                        courseName,
+                                    );
+                                    row.children[4].appendChild(aiButton);
+                                }
+                            }
+
+                            // Create multi professor chat button
+                            const row = rows[0];
+                            const parentDiv =
+                                // @ts-expect-error Trust these elements exist
+                                row.parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.parentElement.parentElement
+                                    .parentElement.parentElement.firstChild
+                                    .firstChild as unknown as HTMLTableColElement;
+
+                            const multiAiContainer = createMultiAiSection(multiProfessorInfo);
+                            multiAiContainer.style.textAlign = "center";
+                            multiAiContainer.querySelector("h2")!.style.fontSize = "2.5em";
+                            parentDiv!.append(multiAiContainer);
+                        }
+                    }
                 }
             }
             break;
