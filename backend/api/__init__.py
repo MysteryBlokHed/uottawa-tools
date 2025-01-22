@@ -105,7 +105,7 @@ async def stream_multi_prof_feedback(
         # Create ID->name mapping
         names_to_ids: dict[str, str] = {}
         for provided_info, returned_info in zip(professors, prof_data):
-            name = f"{returned_info['firstName']} {returned_info['lastName']}"
+            name = f"{returned_info['firstName']} {returned_info['lastName']}".lower()
             names_to_ids[name] = provided_info.id
 
         # Determine which professors we need information on
@@ -117,6 +117,7 @@ async def stream_multi_prof_feedback(
                 prompt=prompt,
             )
         except Exception as e:
+            print("identification error", e)
             raise HTTPException(status_code=503, detail=str(e))
 
         ids_to_names = {v: k for k, v in names_to_ids.items()}
